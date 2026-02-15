@@ -68,6 +68,22 @@ def generate_tests(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="仅生成测试，不保存"
     ),
+    incremental: bool = typer.Option(
+        False, "--incremental", "-inc",
+        help="增量模式：仅对变更代码生成测试"
+    ),
+    base_ref: Optional[str] = typer.Option(
+        None, "--base", "-b",
+        help="基准Git引用 (默认: HEAD~1)"
+    ),
+    head_ref: Optional[str] = typer.Option(
+        None, "--head",
+        help="目标Git引用 (默认: HEAD)"
+    ),
+    html_report: bool = typer.Option(
+        False, "--html-report", "-r",
+        help="生成HTML覆盖率报告"
+    ),
 ) -> None:
     """生成单元测试."""
     console.print(Panel.fit(
@@ -90,6 +106,11 @@ def generate_tests(
     config_table.add_row("最大迭代次数", str(max_iterations))
     config_table.add_row("LLM 提供商", llm_provider)
     config_table.add_row("Dry Run", "是" if dry_run else "否")
+    config_table.add_row("增量模式", "是" if incremental else "否")
+    if incremental:
+        config_table.add_row("基准引用", base_ref or "HEAD~1")
+        config_table.add_row("目标引用", head_ref or "HEAD")
+    config_table.add_row("HTML报告", "是" if html_report else "否")
     console.print(config_table)
     console.print()
 
@@ -101,6 +122,10 @@ def generate_tests(
         max_iterations=max_iterations,
         llm_provider=llm_provider,
         dry_run=dry_run,
+        incremental=incremental,
+        base_ref=base_ref,
+        head_ref=head_ref,
+        html_report=html_report,
     ))
 
 
@@ -188,6 +213,67 @@ def launch_ui(
         raise typer.Exit(1)
 
 
+@app.command(name="ci")
+def ci_mode(
+    project: Path = typer.Argument(
+        ..., help="项目路径", exists=True, file_okay=False, dir_okay=True
+    ),
+    project_type: str = typer.Option(
+        "auto", "--type", "-t", help="项目类型 (auto/java/vue/react/typescript)"
+    ),
+    coverage_target: float = typer.Option(
+        80.0, "--coverage-target", "-c",
+        help="覆盖率目标 (0-100)"
+    ),
+    max_iterations: int = typer.Option(
+        5, "--max-iterations", "-i",
+        help="最大迭代次数"
+    ),
+    llm_provider: str = typer.Option(
+        "openai", "--llm", "-l",
+        help="LLM 提供商"
+    ),
+    output_format: str = typer.Option(
+        "json", "--output", "-o",
+        help="输出格式 (json/markdown/summary)"
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None, "--output-file",
+        help="输出文件路径"
+    ),
+    fail_on_coverage: bool = typer.Option(
+        False, "--fail-on-coverage",
+        help="覆盖率低于目标时返回非零退出码"
+    ),
+    incremental: bool = typer.Option(
+        False, "--incremental", "-inc",
+        help="增量模式：仅对变更代码生成测试"
+    ),
+    base_ref: Optional[str] = typer.Option(
+        None, "--base", "-b",
+        help="基准Git引用"
+    ),
+) -> None:
+    """CI模式：非交互式运行，输出JSON结果."""
+    from ut_agent.ci import CIRunner
+    
+    runner = CIRunner(
+        project_path=str(project),
+        project_type=project_type,
+        coverage_target=coverage_target,
+        max_iterations=max_iterations,
+        llm_provider=llm_provider,
+        output_format=output_format,
+        output_file=str(output_file) if output_file else None,
+        fail_on_coverage=fail_on_coverage,
+        incremental=incremental,
+        base_ref=base_ref,
+    )
+    
+    exit_code = runner.run_sync()
+    raise typer.Exit(exit_code)
+
+
 @app.command(name="check")
 def check_environment() -> None:
     """检查环境配置."""
@@ -201,7 +287,6 @@ def check_environment() -> None:
     table.add_column("状态", style="green")
     table.add_column("信息", style="yellow")
 
-    # 检查 Java
     java_ok, java_msg = check_java_environment()
     table.add_row(
         "Java",
@@ -209,7 +294,6 @@ def check_environment() -> None:
         java_msg
     )
 
-    # 检查 Maven
     maven_ok, maven_msg = check_maven_environment()
     table.add_row(
         "Maven",
@@ -217,7 +301,6 @@ def check_environment() -> None:
         maven_msg
     )
 
-    # 检查 Node.js
     node_ok, node_msg = check_node_environment()
     table.add_row(
         "Node.js",
@@ -225,7 +308,6 @@ def check_environment() -> None:
         node_msg
     )
 
-    # 检查 LLM 配置
     available_providers = list_available_providers()
     table.add_row(
         "LLM 提供商",
@@ -234,6 +316,79 @@ def check_environment() -> None:
     )
 
     console.print(table)
+
+
+@app.command(name="mutation")
+def run_mutation_tests(
+    project: Path = typer.Argument(
+        ..., help="项目路径", exists=True, file_okay=False, dir_okay=True
+    ),
+    target_classes: Optional[str] = typer.Option(
+        None, "--target-classes", "-tc",
+        help="目标类 (逗号分隔, 默认: *)"
+    ),
+    target_tests: Optional[str] = typer.Option(
+        None, "--target-tests", "-tt",
+        help="目标测试类 (逗号分隔, 默认: *Test)"
+    ),
+    mutators: Optional[str] = typer.Option(
+        None, "--mutators", "-m",
+        help="变异算子 (逗号分隔, 默认: DEFAULTS)"
+    ),
+    output_format: str = typer.Option(
+        "summary", "--output", "-o",
+        help="输出格式 (json/summary)"
+    ),
+    suggest_tests: bool = typer.Option(
+        True, "--suggest",
+        help="生成测试建议"
+    ),
+) -> None:
+    """运行变异测试并分析结果."""
+    from ut_agent.tools.mutation_analyzer import MutationAnalyzer
+    
+    console.print(Panel.fit(
+        "[bold purple]🧬 变异测试分析[/bold purple]",
+        border_style="purple"
+    ))
+    
+    analyzer = MutationAnalyzer(
+        project_path=str(project),
+        target_classes=target_classes.split(",") if target_classes else None,
+        target_tests=target_tests.split(",") if target_tests else None,
+        mutators=mutators.split(",") if mutators else None,
+    )
+    
+    console.print("[cyan]正在运行变异测试...[/cyan]")
+    
+    try:
+        report = analyzer.run_mutation_tests()
+        
+        if output_format == "json":
+            console.print_json(data=report.to_dict())
+        else:
+            console.print(analyzer.get_report_summary())
+        
+        if suggest_tests and report.survived_mutations:
+            console.print()
+            console.print("[bold yellow]📝 测试建议[/bold yellow]")
+            
+            suggestions = analyzer.generate_test_suggestions()
+            for i, suggestion in enumerate(suggestions[:10], 1):
+                console.print(f"\n{i}. [cyan]{suggestion['source_file']}:{suggestion['line_number']}[/cyan]")
+                console.print(f"   方法: {suggestion['method_name']}")
+                console.print(f"   变异类型: {suggestion['mutation_type']}")
+                console.print(f"   建议: {suggestion['suggested_test']}")
+            
+            if len(suggestions) > 10:
+                console.print(f"\n   ... 还有 {len(suggestions) - 10} 个建议")
+        
+        if report.survived > 0:
+            raise typer.Exit(1)
+        
+    except Exception as e:
+        console.print(f"[red]变异测试执行失败: {e}[/red]")
+        raise typer.Exit(2)
 
 
 @app.command(name="config")
@@ -267,6 +422,10 @@ async def run_generation_workflow(
     max_iterations: int,
     llm_provider: str,
     dry_run: bool,
+    incremental: bool = False,
+    base_ref: Optional[str] = None,
+    head_ref: Optional[str] = None,
+    html_report: bool = False,
 ) -> None:
     """运行生成工作流."""
     # 创建初始状态
@@ -277,10 +436,15 @@ async def run_generation_workflow(
         "target_files": [],
         "coverage_target": coverage_target,
         "max_iterations": max_iterations,
+        "incremental": incremental,
+        "base_ref": base_ref,
+        "head_ref": head_ref,
         "iteration_count": 0,
         "status": "started",
         "message": "开始执行...",
         "analyzed_files": [],
+        "code_changes": [],
+        "change_summaries": [],
         "generated_tests": [],
         "coverage_report": None,
         "current_coverage": 0.0,
@@ -288,6 +452,7 @@ async def run_generation_workflow(
         "improvement_plan": None,
         "output_path": None,
         "summary": None,
+        "html_report_path": None,
     }
 
     # 创建图

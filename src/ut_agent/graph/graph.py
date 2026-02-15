@@ -4,6 +4,7 @@ from langgraph.graph import StateGraph, END
 from ut_agent.graph.state import AgentState
 from ut_agent.graph.nodes import (
     detect_project_node,
+    detect_changes_node,
     analyze_code_node,
     generate_tests_node,
     save_tests_node,
@@ -12,6 +13,7 @@ from ut_agent.graph.nodes import (
     check_coverage_target_node,
     plan_improvement_node,
     generate_additional_tests_node,
+    generate_html_report_node,
     finalize_node,
 )
 
@@ -26,6 +28,7 @@ def create_test_generation_graph() -> StateGraph:
 
     # 添加节点
     workflow.add_node("detect_project", detect_project_node)
+    workflow.add_node("detect_changes", detect_changes_node)
     workflow.add_node("analyze_code", analyze_code_node)
     workflow.add_node("generate_tests", generate_tests_node)
     workflow.add_node("save_tests", save_tests_node)
@@ -34,13 +37,15 @@ def create_test_generation_graph() -> StateGraph:
     workflow.add_node("check_coverage_target", check_coverage_target_node)
     workflow.add_node("plan_improvement", plan_improvement_node)
     workflow.add_node("generate_additional_tests", generate_additional_tests_node)
+    workflow.add_node("generate_html_report", generate_html_report_node)
     workflow.add_node("finalize", finalize_node)
 
     # 设置入口点
     workflow.set_entry_point("detect_project")
 
     # 添加边 - 主流程
-    workflow.add_edge("detect_project", "analyze_code")
+    workflow.add_edge("detect_project", "detect_changes")
+    workflow.add_edge("detect_changes", "analyze_code")
     workflow.add_edge("analyze_code", "generate_tests")
     workflow.add_edge("generate_tests", "save_tests")
     workflow.add_edge("save_tests", "execute_tests")
@@ -52,8 +57,8 @@ def create_test_generation_graph() -> StateGraph:
         "check_coverage_target",
         lambda state: state["status"],
         {
-            "target_reached": "finalize",
-            "max_iterations_reached": "finalize",
+            "target_reached": "generate_html_report",
+            "max_iterations_reached": "generate_html_report",
             "needs_improvement": "plan_improvement",
         },
     )
@@ -61,6 +66,9 @@ def create_test_generation_graph() -> StateGraph:
     # 迭代改进循环
     workflow.add_edge("plan_improvement", "generate_additional_tests")
     workflow.add_edge("generate_additional_tests", "save_tests")
+
+    # HTML报告生成后结束
+    workflow.add_edge("generate_html_report", "finalize")
 
     # 结束节点
     workflow.add_edge("finalize", END)

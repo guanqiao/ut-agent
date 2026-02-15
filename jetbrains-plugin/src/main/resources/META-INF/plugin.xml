@@ -1,0 +1,74 @@
+<idea-plugin>
+    <id>com.utagent.intellij</id>
+    <name>UT-Agent: AI Unit Test Generator</name>
+    <vendor email="support@utagent.dev" url="https://utagent.dev">UT-Agent Team</vendor>
+    
+    <description><![CDATA[
+    <p>AI驱动的单元测试生成插件 - 支持Java/Kotlin项目</p>
+    <p>特性：</p>
+    <ul>
+        <li>一键生成单元测试</li>
+        <li>支持JUnit 5/JUnit 4/TestNG</li>
+        <li>智能Mock推荐</li>
+        <li>覆盖率目标驱动</li>
+        <li>支持Spring Boot项目</li>
+    </ul>
+    ]]></description>
+    
+    <change-notes><![CDATA[
+    <ul>
+        <li>0.1.0 - 初始版本</li>
+    </ul>
+    ]]></change-notes>
+    
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends optional="true" config-file="kotlin.xml">org.jetbrains.kotlin</depends>
+    
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="UT-Agent"
+                    secondary="true"
+                    icon="/META-INF/pluginIcon.svg"
+                    anchor="right"
+                    factoryClass="com.utagent.toolwindow.UTAgentToolWindowFactory"/>
+        
+        <applicationConfigurable parentId="tools"
+                                 instance="com.utagent.config.UTAgentConfigurable"
+                                 id="com.utagent.config.UTAgentConfigurable"
+                                 displayName="UT-Agent"/>
+        
+        <applicationService serviceImplementation="com.utagent.service.UTAgentSettingsService"/>
+        <projectService serviceImplementation="com.utagent.service.UTAgentProjectService"/>
+    </extensions>
+    
+    <actions>
+        <group id="UTAgent.Group" text="UT-Agent" popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            
+            <action id="UTAgent.GenerateTest"
+                    class="com.utagent.actions.GenerateTestAction"
+                    text="Generate Unit Test"
+                    description="Generate unit test for the selected class">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift T"/>
+            </action>
+            
+            <action id="UTAgent.GenerateTestForMethod"
+                    class="com.utagent.actions.GenerateMethodTestAction"
+                    text="Generate Test for Method"
+                    description="Generate unit test for the selected method"/>
+            
+            <action id="UTAgent.RunWithCoverage"
+                    class="com.utagent.actions.RunWithCoverageAction"
+                    text="Run Tests with Coverage"
+                    description="Run tests and check coverage"/>
+            
+            <separator/>
+            
+            <action id="UTAgent.ShowReport"
+                    class="com.utagent.actions.ShowReportAction"
+                    text="Show Coverage Report"
+                    description="Show the last coverage report"/>
+        </group>
+    </actions>
+</idea-plugin>

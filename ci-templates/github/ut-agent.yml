@@ -1,0 +1,270 @@
+name: UT-Agent Test Generation
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'build.gradle*'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      coverage_target:
+        description: 'Coverage target percentage'
+        required: false
+        default: '80'
+      max_iterations:
+        description: 'Max iterations for test generation'
+        required: false
+        default: '5'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      java_files: ${{ steps.detect.outputs.java_files }}
+      frontend_files: ${{ steps.detect.outputs.frontend_files }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        id: detect
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE_SHA="${{ github.base_ref }}"
+            HEAD_SHA="${{ github.sha }}"
+            CHANGED_FILES=$(git diff --name-only origin/$BASE_SHA $HEAD_SHA)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          JAVA_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(java|kt)$' | grep -v 'Test\.(java|kt)$' || true)
+          FRONTEND_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx|vue|js)$' | grep -v '\.(test|spec)\.' || true)
+          
+          echo "java_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$JAVA_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "frontend_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FRONTEND_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          if [ -n "$JAVA_FILES" ] || [ -n "$FRONTEND_FILES" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+  generate-java-tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install UT-Agent
+        run: |
+          pip install ut-agent
+          
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Generate tests for changed files
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          COVERAGE_TARGET="${{ github.event.inputs.coverage_target || '80' }}"
+          MAX_ITERATIONS="${{ github.event.inputs.max_iterations || '5' }}"
+          
+          ut-agent generate \
+            --project . \
+            --type java \
+            --coverage-target $COVERAGE_TARGET \
+            --max-iterations $MAX_ITERATIONS \
+            --ci \
+            --output json > ut-agent-result.json
+          
+          cat ut-agent-result.json
+
+      - name: Run tests with coverage
+        run: |
+          mvn test jacoco:report -B || true
+
+      - name: Parse coverage report
+        id: coverage
+        run: |
+          if [ -f "target/site/jacoco/jacoco.xml" ]; then
+            COVERAGE=$(python -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('target/site/jacoco/jacoco.xml')
+root = tree.getroot()
+for counter in root.findall('counter'):
+    if counter.get('type') == 'LINE':
+        covered = int(counter.get('covered', 0))
+        missed = int(counter.get('missed', 0))
+        total = covered + missed
+        if total > 0:
+            print(f'{covered / total * 100:.2f}')
+            break
+" || echo "0")
+            echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          else
+            echo "coverage=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let result = {};
+            try {
+              result = JSON.parse(fs.readFileSync('ut-agent-result.json', 'utf8'));
+            } catch (e) {}
+            
+            const coverage = '${{ steps.coverage.outputs.coverage }}' || '0';
+            const target = '${{ github.event.inputs.coverage_target }}' || '80';
+            
+            const body = `## 🧪 UT-Agent Test Generation Report
+            
+            | Metric | Value |
+            |--------|-------|
+            | **Coverage** | ${coverage}% |
+            | **Target** | ${target}% |
+            | **Status** | ${parseFloat(coverage) >= parseFloat(target) ? '✅ Passed' : '⚠️ Below target'} |
+            
+            ### Generated Tests
+            ${result.generated_tests?.map(t => `- \`${t.test_file_path}\``).join('\n') || 'No new tests generated'}
+            
+            ### Coverage Gaps
+            ${result.coverage_gaps?.slice(0, 5).map(g => `- \`${g.file_path}:${g.line_number}\``).join('\n') || 'No significant gaps'}
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: |
+            target/site/jacoco/
+            ut-agent-result.json
+          retention-days: 30
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE="${{ steps.coverage.outputs.coverage }}"
+          TARGET="${{ github.event.inputs.coverage_target || '80' }}"
+          
+          if [ -n "$COVERAGE" ]; then
+            echo "Coverage: $COVERAGE% (Target: $TARGET%)"
+            if (( $(echo "$COVERAGE < $TARGET" | bc -l) )); then
+              echo "::warning::Coverage $COVERAGE% is below target $TARGET%"
+            fi
+          fi
+
+  generate-frontend-tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install UT-Agent
+        run: pip install ut-agent
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Generate tests for frontend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          ut-agent generate \
+            --project . \
+            --type typescript \
+            --coverage-target ${{ github.event.inputs.coverage_target || '80' }} \
+            --ci \
+            --output json > ut-agent-result.json || true
+
+      - name: Run tests
+        run: npm test -- --coverage || true
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: coverage/
+          retention-days: 30
+
+  coverage-badge:
+    needs: [generate-java-tests]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report
+
+      - name: Update coverage badge
+        run: |
+          if [ -f "coverage-report/ut-agent-result.json" ]; then
+            COVERAGE=$(cat coverage-report/ut-agent-result.json | jq -r '.coverage // 0')
+            COLOR="green"
+            if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+              COLOR="yellow"
+            fi
+            if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+              COLOR="red"
+            fi
+            
+            echo "Coverage: $COVERAGE% - Badge color: $COLOR"
+          fi

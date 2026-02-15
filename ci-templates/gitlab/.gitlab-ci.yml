@@ -1,0 +1,269 @@
+# UT-Agent GitLab CI/CD Template
+# Copy this file to your project's .gitlab-ci.yml or include it
+
+stages:
+  - detect
+  - generate
+  - test
+  - report
+
+variables:
+  PYTHON_VERSION: "3.11"
+  JAVA_VERSION: "17"
+  NODE_VERSION: "20"
+  COVERAGE_TARGET: "80"
+  MAX_ITERATIONS: "5"
+  UT_AGENT_VERSION: "latest"
+
+.detect-changes:
+  stage: detect
+  image: alpine:latest
+  script:
+    - apk add --no-cache git
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
+        CHANGED_FILES=$(git diff --name-only origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)
+      else
+        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+      fi
+    - JAVA_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(java|kt)$' | grep -v 'Test\.(java|kt)$' || true)
+    - FRONTEND_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx|vue|js)$' | grep -v '\.(test|spec)\.' || true)
+    - echo "java_files=$JAVA_FILES" >> detect.env
+    - echo "frontend_files=$FRONTEND_FILES" >> detect.env
+    - |
+      if [ -n "$JAVA_FILES" ] || [ -n "$FRONTEND_FILES" ]; then
+        echo "has_changes=true" >> detect.env
+      else
+        echo "has_changes=false" >> detect.env
+      fi
+  artifacts:
+    reports:
+      dotenv: detect.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+detect-changes:
+  extends: .detect-changes
+
+generate-java-tests:
+  stage: generate
+  image: python:${PYTHON_VERSION}
+  needs:
+    - detect-changes
+  before_script:
+    - apt-get update && apt-get install -y default-jdk maven
+    - pip install ut-agent==$UT_AGENT_VERSION
+  script:
+    - |
+      if [ "$has_changes" == "true" ]; then
+        ut-agent generate \
+          --project . \
+          --type java \
+          --coverage-target $COVERAGE_TARGET \
+          --max-iterations $MAX_ITERATIONS \
+          --ci \
+          --output json > ut-agent-result.json || true
+        
+        cat ut-agent-result.json
+      else
+        echo "No relevant changes detected"
+        echo '{"status": "skipped"}' > ut-agent-result.json
+      fi
+  artifacts:
+    paths:
+      - ut-agent-result.json
+      - src/test/
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+run-java-tests:
+  stage: test
+  image: maven:3.9-eclipse-temurin-${JAVA_VERSION}
+  needs:
+    - generate-java-tests
+  script:
+    - mvn test jacoco:report -B || true
+  after_script:
+    - |
+      if [ -f "target/site/jacoco/jacoco.xml" ]; then
+        COVERAGE=$(python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('target/site/jacoco/jacoco.xml')
+root = tree.getroot()
+for counter in root.findall('counter'):
+    if counter.get('type') == 'LINE':
+        covered = int(counter.get('covered', 0))
+        missed = int(counter.get('missed', 0))
+        total = covered + missed
+        if total > 0:
+            print(f'{covered / total * 100:.2f}')
+            break
+" || echo "0")
+        echo "COVERAGE=$COVERAGE" >> coverage.env
+        echo "Coverage: $COVERAGE%"
+      fi
+  artifacts:
+    paths:
+      - target/site/jacoco/
+    reports:
+      coverage_report:
+        coverage_format: jacoco
+        path: target/site/jacoco/jacoco.xml
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+generate-frontend-tests:
+  stage: generate
+  image: node:${NODE_VERSION}
+  needs:
+    - detect-changes
+  before_script:
+    - apt-get update && apt-get install -y python3 python3-pip
+    - pip3 install ut-agent==$UT_AGENT_VERSION --break-system-packages || pip3 install ut-agent==$UT_AGENT_VERSION
+    - npm ci || npm install
+  script:
+    - |
+      if [ "$has_changes" == "true" ]; then
+        ut-agent generate \
+          --project . \
+          --type typescript \
+          --coverage-target $COVERAGE_TARGET \
+          --ci \
+          --output json > ut-agent-result.json || true
+      else
+        echo '{"status": "skipped"}' > ut-agent-result.json
+      fi
+  artifacts:
+    paths:
+      - ut-agent-result.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
+
+run-frontend-tests:
+  stage: test
+  image: node:${NODE_VERSION}
+  needs:
+    - generate-frontend-tests
+  script:
+    - npm test -- --coverage || true
+  artifacts:
+    paths:
+      - coverage/
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
+
+report-coverage:
+  stage: report
+  image: alpine:latest
+  needs:
+    - run-java-tests
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      if [ -f "ut-agent-result.json" ]; then
+        COVERAGE=$(cat ut-agent-result.json | jq -r '.coverage // 0')
+        TARGET=$COVERAGE_TARGET
+        
+        echo "## 🧪 UT-Agent Coverage Report" > report.md
+        echo "" >> report.md
+        echo "| Metric | Value |" >> report.md
+        echo "|--------|-------|" >> report.md
+        echo "| **Coverage** | ${COVERAGE}% |" >> report.md
+        echo "| **Target** | ${TARGET}% |" >> report.md
+        
+        if [ "$(echo "$COVERAGE >= $TARGET" | bc -l)" == "1" ]; then
+          echo "| **Status** | ✅ Passed |" >> report.md
+        else
+          echo "| **Status** | ⚠️ Below target |" >> report.md
+        fi
+        
+        cat report.md
+      fi
+  artifacts:
+    paths:
+      - report.md
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+comment-mr:
+  stage: report
+  image: curlimages/curl:latest
+  needs:
+    - report-coverage
+    - run-java-tests
+  script:
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
+        COVERAGE=$(cat ut-agent-result.json 2>/dev/null | jq -r '.coverage // 0' || echo "0")
+        TARGET=$COVERAGE_TARGET
+        
+        COMMENT="## 🧪 UT-Agent Test Generation Report
+        
+        | Metric | Value |
+        |--------|-------|
+        | **Coverage** | ${COVERAGE}% |
+        | **Target** | ${TARGET}% |
+        | **Status** | $(if [ "$(echo "$COVERAGE >= $TARGET" | bc -l)" == "1" ]; then echo "✅ Passed"; else echo "⚠️ Below target"; fi) |
+        
+        [View detailed report](${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts)
+        "
+        
+        curl -X POST \
+          -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"body\": $(echo "$COMMENT" | jq -Rs .)}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" || true
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+coverage-gate:
+  stage: report
+  image: alpine:latest
+  needs:
+    - run-java-tests
+  script:
+    - |
+      if [ -f "coverage.env" ]; then
+        source coverage.env
+        if [ -n "$COVERAGE" ]; then
+          echo "Coverage: $COVERAGE% (Target: $COVERAGE_TARGET%)"
+          if [ "$(echo "$COVERAGE < $COVERAGE_TARGET" | bc -l)" == "1" ]; then
+            echo "⚠️ Coverage is below target, but pipeline continues"
+          fi
+        fi
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
+
+pages:
+  stage: report
+  image: alpine:latest
+  needs:
+    - run-java-tests
+  script:
+    - mkdir -p public
+    - cp -r target/site/jacoco/* public/ 2>/dev/null || echo "No coverage report"
+    - echo "<html><head><title>Coverage Report</title></head><body><h1>Coverage Report</h1><p><a href='jacoco/index.html'>View JaCoCo Report</a></p></body></html>" > public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

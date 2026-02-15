@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "ut-agent"
+version = "0.1.0"
+description = "AI驱动的单元测试生成Agent - 支持Java/Vue/React/TypeScript"
+authors = ["UT-Agent Team"]
+readme = "README.md"
+packages = [{include = "ut_agent", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langgraph = "^0.2.70"
+langchain = "^0.3.15"
+langchain-core = "^0.3.31"
+langchain-openai = "^0.3.0"
+langchain-ollama = "^0.2.0"
+openai = "^1.59.0"
+pydantic = "^2.10.0"
+pydantic-settings = "^2.7.0"
+typer = {extras = ["all"], version = "^0.15.0"}
+streamlit = "^1.41.0"
+javalang = "^0.13.0"
+tree-sitter = "^0.23.0"
+tree-sitter-java = "^0.23.0"
+tree-sitter-typescript = "^0.23.0"
+tree-sitter-python = "^0.23.0"
+xmltodict = "^0.14.0"
+beautifulsoup4 = "^4.12.0"
+lxml = "^5.3.0"
+rich = "^13.9.0"
+python-dotenv = "^1.0.0"
+aiofiles = "^24.1.0"
+httpx = "^0.28.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.25.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+isort = "^5.13.0"
+flake8 = "^7.1.0"
+mypy = "^1.14.0"
+pre-commit = "^4.0.0"
+
+[tool.poetry.scripts]
+ut-agent = "ut_agent.main:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

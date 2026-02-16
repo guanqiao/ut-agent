@@ -673,6 +673,567 @@ describe('{{ hook_name }}', () => {
 """
         ))
 
+        # Python pytest 类测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="python-pytest-class",
+            description="Python pytest 类测试模板",
+            language="python",
+            framework="pytest",
+            tags=["python", "pytest", "class"],
+            template_content="""\"\"\"{{ class_name }} 测试模块.\"\"\"
+
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+from {{ module_name }} import {{ class_name }}
+
+
+class Test{{ class_name }}:
+    \"\"\"{{ class_name }} 测试类.\"\"\"
+
+    @pytest.fixture
+    def {{ instance_name }}(self):
+        \"\"\"创建测试实例.\"\"\"
+        return {{ class_name }}()
+
+    {% for fixture in fixtures %}
+    @pytest.fixture
+    def {{ fixture.name }}(self):
+        \"\"\"{{ fixture.description }}.\"\"\"
+        {{ fixture.body }}
+    {% endfor %}
+
+    {% for method in methods %}
+    class Test{{ method.name | title }}:
+        \"\"\"{{ method.name }} 方法测试.\"\"\"
+
+        def test_{{ method.name }}_with_valid_input_returns_success(self, {{ instance_name }}):
+            \"\"\"测试正常输入返回成功.\"\"\"
+            # Arrange
+            {% for param in method.parameters %}
+            {{ param.name }} = {{ param.test_value }}
+            {% endfor %}
+
+            # Act
+            result = {{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+            # Assert
+            {% for assertion in method.assertions %}
+            {{ assertion }}
+            {% endfor %}
+
+        def test_{{ method.name }}_with_invalid_input_raises_exception(self, {{ instance_name }}):
+            \"\"\"测试无效输入抛出异常.\"\"\"
+            # Arrange
+            {% for param in method.invalid_parameters %}
+            {{ param.name }} = {{ param.value }}
+            {% endfor %}
+
+            # Act & Assert
+            with pytest.raises({{ method.exception_type }}):
+                {{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+        def test_{{ method.name }}_with_boundary_values_handles_correctly(self, {{ instance_name }}):
+            \"\"\"测试边界值处理.\"\"\"
+            # Arrange
+            {% for param in method.boundary_parameters %}
+            {{ param.name }} = {{ param.value }}
+            {% endfor %}
+
+            # Act
+            result = {{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+            # Assert
+            assert result is not None
+
+        {% for edge_case in method.edge_cases %}
+        def test_{{ method.name }}_{{ edge_case.name }}(self, {{ instance_name }}):
+            \"\"\"{{ edge_case.description }}.\"\"\"
+            # Arrange
+            {{ edge_case.arrange }}
+
+            # Act
+            {{ edge_case.act }}
+
+            # Assert
+            {{ edge_case.assert }}
+        {% endfor %}
+    {% endfor %}
+"""
+        ))
+
+        # Python pytest 函数测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="python-pytest-function",
+            description="Python pytest 函数测试模板",
+            language="python",
+            framework="pytest",
+            tags=["python", "pytest", "function"],
+            template_content="""\"\"\"{{ function_name }} 测试模块.\"\"\"
+
+import pytest
+from {{ module_name }} import {{ function_name }}
+
+
+class Test{{ function_name | title }}:
+    \"\"\"{{ function_name }} 函数测试.\"\"\"
+
+    def test_{{ function_name }}_with_valid_input_returns_expected(self):
+        \"\"\"测试正常输入返回预期结果.\"\"\"
+        # Arrange
+        {% for param in parameters %}
+        {{ param.name }} = {{ param.test_value }}
+        {% endfor %}
+        expected = {{ expected_value }}
+
+        # Act
+        result = {{ function_name }}({{ param_names }})
+
+        # Assert
+        assert result == expected
+
+    def test_{{ function_name }}_with_none_input_handles_gracefully(self):
+        \"\"\"测试 None 输入处理.\"\"\"
+        # Act
+        result = {{ function_name }}(None)
+
+        # Assert
+        {% if returns_none %}
+        assert result is None
+        {% else %}
+        assert result is not None
+        {% endif %}
+
+    def test_{{ function_name }}_with_empty_input_returns_default(self):
+        \"\"\"测试空输入返回默认值.\"\"\"
+        # Arrange
+        empty_input = {{ empty_value }}
+
+        # Act
+        result = {{ function_name }}(empty_input)
+
+        # Assert
+        assert result == {{ default_value }}
+
+    {% if has_numbers %}
+    @pytest.mark.parametrize("input_value,expected", [
+        (0, {{ zero_expected }}),
+        (1, {{ one_expected }}),
+        (-1, {{ minus_one_expected }}),
+        (float('inf'), {{ inf_expected }}),
+        (float('-inf'), {{ minus_inf_expected }}),
+    ])
+    def test_{{ function_name }}_with_various_numbers(self, input_value, expected):
+        \"\"\"测试各种数值输入.\"\"\"
+        result = {{ function_name }}(input_value)
+        assert result == expected
+    {% endif %}
+
+    {% if has_strings %}
+    @pytest.mark.parametrize("input_value,expected", [
+        ("", {{ empty_string_expected }}),
+        ("a", {{ single_char_expected }}),
+        ("hello world", {{ normal_string_expected }}),
+        ("  ", {{ whitespace_expected }}),
+    ])
+    def test_{{ function_name }}_with_various_strings(self, input_value, expected):
+        \"\"\"测试各种字符串输入.\"\"\"
+        result = {{ function_name }}(input_value)
+        assert result == expected
+    {% endif %}
+
+    {% for test_case in test_cases %}
+    def test_{{ function_name }}_{{ test_case.name }}(self):
+        \"\"\"{{ test_case.description }}.\"\"\"
+        # Arrange
+        {{ test_case.arrange }}
+
+        # Act
+        result = {{ function_name }}({{ test_case.input }})
+
+        # Assert
+        {{ test_case.assert }}
+    {% endfor %}
+"""
+        ))
+
+        # Python unittest 测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="python-unittest",
+            description="Python unittest 测试模板",
+            language="python",
+            framework="unittest",
+            tags=["python", "unittest", "class"],
+            template_content="""\"\"\"{{ class_name }} 测试模块.\"\"\"
+
+import unittest
+from unittest.mock import Mock, patch, MagicMock
+from {{ module_name }} import {{ class_name }}
+
+
+class Test{{ class_name }}(unittest.TestCase):
+    \"\"\"{{ class_name }} 测试类.\"\"\"
+
+    def setUp(self):
+        \"\"\"测试前准备.\"\"\"
+        self.{{ instance_name }} = {{ class_name }}()
+        {% for setup in setup_statements %}
+        {{ setup }}
+        {% endfor %}
+
+    def tearDown(self):
+        \"\"\"测试后清理.\"\"\"
+        pass
+
+    {% for method in methods %}
+    def test_{{ method.name }}_with_valid_input_returns_success(self):
+        \"\"\"测试 {{ method.name }} 正常输入.\"\"\"
+        # Arrange
+        {% for param in method.parameters %}
+        {{ param.name }} = {{ param.test_value }}
+        {% endfor %}
+
+        # Act
+        result = self.{{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+        # Assert
+        {% for assertion in method.assertions %}
+        {{ assertion }}
+        {% endfor %}
+
+    def test_{{ method.name }}_with_invalid_input_raises_exception(self):
+        \"\"\"测试 {{ method.name }} 无效输入.\"\"\"
+        # Arrange
+        {% for param in method.invalid_parameters %}
+        {{ param.name }} = {{ param.value }}
+        {% endfor %}
+
+        # Act & Assert
+        with self.assertRaises({{ method.exception_type }}):
+            self.{{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+    def test_{{ method.name }}_with_boundary_values(self):
+        \"\"\"测试 {{ method.name }} 边界值.\"\"\"
+        # Arrange
+        {% for param in method.boundary_parameters %}
+        {{ param.name }} = {{ param.value }}
+        {% endfor %}
+
+        # Act
+        result = self.{{ instance_name }}.{{ method.name }}({{ method.param_names }})
+
+        # Assert
+        self.assertIsNotNone(result)
+    {% endfor %}
+
+
+if __name__ == '__main__':
+    unittest.main()
+"""
+        ))
+
+        # Java TestNG 测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="java-testng-service",
+            description="Java TestNG Service 测试模板",
+            language="java",
+            framework="testng",
+            tags=["java", "testng", "service"],
+            template_content="""package {{ package }};
+
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.DataProvider;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import static org.testng.Assert.*;
+import static org.mockito.Mockito.*;
+
+public class {{ class_name }}Test {
+
+    @InjectMocks
+    private {{ class_name }} {{ instance_name }};
+
+    {% for mock in mocks %}
+    @Mock
+    private {{ mock.type }} {{ mock.name }};
+    {% endfor %}
+
+    private AutoCloseable mocks;
+
+    @BeforeMethod
+    public void setUp() {
+        mocks = MockitoAnnotations.openMocks(this);
+    }
+
+    @AfterMethod
+    public void tearDown() throws Exception {
+        mocks.close();
+    }
+
+    {% for method in methods %}
+    @Test
+    public void test{{ method.name | title }}_withValidInput_returnsSuccess() {
+        // Arrange
+        {% for param in method.parameters %}
+        {{ param.type }} {{ param.name }} = {{ param.test_value }};
+        {% endfor %}
+
+        {% for mock in method.mocks %}
+        when({{ mock.name }}.{{ mock.method }}({{ mock.args }})).thenReturn({{ mock.return_value }});
+        {% endfor %}
+
+        // Act
+        {{ method.return_type }} result = {{ instance_name }}.{{ method.name }}({{ method.param_names }});
+
+        // Assert
+        assertNotNull(result);
+        {% for assertion in method.assertions %}
+        {{ assertion }}
+        {% endfor %}
+    }
+
+    @Test(expectedExceptions = {{ method.exception_type }}.class)
+    public void test{{ method.name | title }}_withInvalidInput_throwsException() {
+        // Arrange
+        {% for param in method.invalid_parameters %}
+        {{ param.type }} {{ param.name }} = {{ param.value }};
+        {% endfor %}
+
+        // Act
+        {{ instance_name }}.{{ method.name }}({{ method.param_names }});
+    }
+
+    {% if method.has_data_provider %}
+    @DataProvider(name = "{{ method.name }}DataProvider")
+    public Object[][] {{ method.name }}TestData() {
+        return new Object[][] {
+            {% for data in method.test_data %}
+            { {{ data.values }} },
+            {% endfor %}
+        };
+    }
+
+    @Test(dataProvider = "{{ method.name }}DataProvider")
+    public void test{{ method.name | title }}_withVariousInputs(
+        {% for param in method.parameters %}
+        {{ param.type }} {{ param.name }},
+        {% endfor %}
+        {{ method.return_type }} expected
+    ) {
+        {{ method.return_type }} result = {{ instance_name }}.{{ method.name }}({{ method.param_names }});
+        assertEquals(result, expected);
+    }
+    {% endif %}
+    {% endfor %}
+}
+"""
+        ))
+
+        # JavaScript Jest 测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="js-jest-function",
+            description="JavaScript Jest 函数测试模板",
+            language="javascript",
+            framework="jest",
+            tags=["javascript", "jest", "function"],
+            template_content="""/**
+ * {{ function_name }} 测试
+ */
+
+const { {{ function_name }} } = require('./{{ file_name }}');
+
+describe('{{ function_name }}', () => {
+  describe('正常场景', () => {
+    test('应该正确处理正常输入', () => {
+      // Arrange
+      const input = {{ normal_input }};
+      const expected = {{ expected_output }};
+
+      // Act
+      const result = {{ function_name }}(input);
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    {% for test_case in test_cases %}
+    test('{{ test_case.description }}', () => {
+      const result = {{ function_name }}({{ test_case.input }});
+      expect(result).toEqual({{ test_case.expected }});
+    });
+    {% endfor %}
+  });
+
+  describe('边界条件', () => {
+    test('应该处理空输入', () => {
+      const result = {{ function_name }}({{ empty_input }});
+      expect(result).toBe({{ empty_expected }});
+    });
+
+    test('应该处理 null', () => {
+      const result = {{ function_name }}(null);
+      expect(result).toBeNull();
+    });
+
+    test('应该处理 undefined', () => {
+      const result = {{ function_name }}(undefined);
+      expect(result).toBeUndefined();
+    });
+
+    {% if has_numbers %}
+    test('应该处理最大值', () => {
+      const result = {{ function_name }}(Number.MAX_VALUE);
+      expect(result).toBeDefined();
+    });
+
+    test('应该处理最小值', () => {
+      const result = {{ function_name }}(Number.MIN_VALUE);
+      expect(result).toBeDefined();
+    });
+    {% endif %}
+
+    {% if has_strings %}
+    test('应该处理空字符串', () => {
+      const result = {{ function_name }}('');
+      expect(result).toBe('');
+    });
+
+    test('应该处理超长字符串', () => {
+      const longString = 'a'.repeat(10000);
+      const result = {{ function_name }}(longString);
+      expect(result).toBeDefined();
+    });
+    {% endif %}
+  });
+
+  describe('异常场景', () => {
+    test('应该抛出异常当输入无效', () => {
+      expect(() => {{ function_name }}({{ invalid_input }})).toThrow();
+    });
+
+    {% for error_case in error_cases %}
+    test('应该抛出异常: {{ error_case.description }}', () => {
+      expect(() => {{ function_name }}({{ error_case.input }})).toThrow('{{ error_case.message }}');
+    });
+    {% endfor %}
+  });
+
+  {% if has_async %}
+  describe('异步操作', () => {
+    test('应该正确处理异步操作', async () => {
+      const result = await {{ function_name }}({{ async_input }});
+      expect(result).toEqual({{ async_expected }});
+    });
+
+    test('应该处理异步错误', async () => {
+      await expect({{ function_name }}({{ async_error_input }})).rejects.toThrow();
+    });
+  });
+  {% endif %}
+});
+"""
+        ))
+
+        # JavaScript Jest 类测试模板
+        self.engine.register_template(UnitTestTemplate(
+            name="js-jest-class",
+            description="JavaScript Jest 类测试模板",
+            language="javascript",
+            framework="jest",
+            tags=["javascript", "jest", "class"],
+            template_content="""/**
+ * {{ class_name }} 测试
+ */
+
+const { {{ class_name }} } = require('./{{ file_name }}');
+
+// Mock 依赖
+{% for mock in mocks %}
+jest.mock('{{ mock.source }}', () => ({
+  {{ mock.name }}: jest.fn()
+}));
+{% endfor %}
+
+describe('{{ class_name }}', () => {
+  let {{ instance_name }};
+
+  beforeEach(() => {
+    {{ instance_name }} = new {{ class_name }}();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('构造函数', () => {
+    test('应该正确初始化实例', () => {
+      expect({{ instance_name }}).toBeInstanceOf({{ class_name }});
+    });
+
+    {% for property in properties %}
+    test('应该正确初始化 {{ property.name }}', () => {
+      expect({{ instance_name }}.{{ property.name }}).toBe({{ property.default_value }});
+    });
+    {% endfor %}
+  });
+
+  {% for method in methods %}
+  describe('{{ method.name }}', () => {
+    test('应该正确处理正常输入', () => {
+      // Arrange
+      {% for param in method.parameters %}
+      const {{ param.name }} = {{ param.test_value }};
+      {% endfor %}
+
+      // Act
+      const result = {{ instance_name }}.{{ method.name }}({{ method.param_names }});
+
+      // Assert
+      {% for assertion in method.assertions %}
+      {{ assertion }}
+      {% endfor %}
+    });
+
+    test('应该处理无效输入', () => {
+      // Arrange
+      {% for param in method.invalid_parameters %}
+      const {{ param.name }} = {{ param.value }};
+      {% endfor %}
+
+      // Act & Assert
+      expect(() => {{ instance_name }}.{{ method.name }}({{ method.param_names }})).toThrow();
+    });
+
+    test('应该处理边界条件', () => {
+      // Arrange
+      {% for param in method.boundary_parameters %}
+      const {{ param.name }} = {{ param.value }};
+      {% endfor %}
+
+      // Act
+      const result = {{ instance_name }}.{{ method.name }}({{ method.param_names }});
+
+      // Assert
+      expect(result).toBeDefined();
+    });
+
+    {% for edge_case in method.edge_cases %}
+    test('{{ edge_case.description }}', () => {
+      {{ edge_case.arrange }}
+      {{ edge_case.act }}
+      {{ edge_case.assert }}
+    });
+    {% endfor %}
+  });
+  {% endfor %}
+});
+"""
+        ))
+
     def _load_custom_templates(self) -> None:
         """加载用户自定义模板."""
         if not self.custom_templates_dir:
@@ -728,31 +1289,57 @@ describe('{{ hook_name }}', () => {
     ) -> Optional[UnitTestTemplate]:
         """为文件选择合适的模板."""
         language = file_analysis.get("language", "")
+        framework = file_analysis.get("framework", "")
 
-        # 根据文件类型选择模板
         if language == "java":
             content = file_analysis.get("content", "")
 
-            if "@Controller" in content or "@RestController" in content:
-                return self.engine.get_template("java-spring-controller")
-            elif "@Service" in content:
-                return self.engine.get_template("java-spring-service")
-            elif "@Repository" in content or "extends JpaRepository" in content:
-                return self.engine.get_template("java-spring-repository")
+            if framework == "testng":
+                return self.engine.get_template("java-testng-service")
             else:
-                # 默认使用 Service 模板
-                return self.engine.get_template("java-spring-service")
+                if "@Controller" in content or "@RestController" in content:
+                    return self.engine.get_template("java-spring-controller")
+                elif "@Service" in content:
+                    return self.engine.get_template("java-spring-service")
+                elif "@Repository" in content or "extends JpaRepository" in content:
+                    return self.engine.get_template("java-spring-repository")
+                else:
+                    return self.engine.get_template("java-spring-service")
+
+        elif language == "python":
+            if framework == "unittest":
+                return self.engine.get_template("python-unittest")
+            else:
+                content = file_analysis.get("content", "")
+                if "class " in content:
+                    return self.engine.get_template("python-pytest-class")
+                else:
+                    return self.engine.get_template("python-pytest-function")
+
+        elif language == "javascript":
+            content = file_analysis.get("content", "")
+            if "class " in content:
+                return self.engine.get_template("js-jest-class")
+            else:
+                return self.engine.get_template("js-jest-function")
 
         elif language == "vue":
             return self.engine.get_template("vue-component")
 
         elif language == "typescript":
-            # 检查是否是 Hook
             content = file_analysis.get("content", "")
-            if "use" in file_analysis.get("file_name", "").lower():
-                return self.engine.get_template("react-hook")
+            file_name = file_analysis.get("file_name", "").lower()
+
+            if framework == "jest":
+                if "class " in content:
+                    return self.engine.get_template("js-jest-class")
+                else:
+                    return self.engine.get_template("js-jest-function")
             else:
-                return self.engine.get_template("ts-utility")
+                if ("use" in file_name and "hook" in file_name) or "use" in file_name[:4]:
+                    return self.engine.get_template("react-hook")
+                else:
+                    return self.engine.get_template("ts-utility")
 
         return None
 

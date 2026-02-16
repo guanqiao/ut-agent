@@ -481,6 +481,349 @@ def show_metrics() -> None:
     log_metrics_summary()
 
 
+@app.command(name="testability")
+def analyze_testability(
+    source_file: Path = typer.Argument(
+        ..., help="源文件路径", exists=True, file_okay=True, dir_okay=False
+    ),
+    output_format: str = typer.Option(
+        "summary", "--output", "-o",
+        help="输出格式 (summary/json/detailed)"
+    ),
+    show_refactoring: bool = typer.Option(
+        True, "--refactoring", "-r",
+        help="显示重构建议"
+    ),
+) -> None:
+    """分析代码可测试性."""
+    from ut_agent.tools.testability_analyzer import (
+        TestabilityAnalyzer,
+        RefactoringAdvisor,
+    )
+    
+    console.print(Panel.fit(
+        "[bold cyan]🔍 可测试性分析[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    analyzer = TestabilityAnalyzer(str(source_file.parent))
+    
+    with open(source_file, 'r', encoding='utf-8') as f:
+        source_code = f.read()
+    
+    score = analyzer.analyze_file(str(source_file), source_code)
+    
+    if output_format == "json":
+        console.print_json(data=score.to_dict())
+    else:
+        console.print(f"\n[bold]可测试性评分: {score.overall_score:.1f}/100[/bold]")
+        
+        table = Table(box=box.ROUNDED)
+        table.add_column("维度", style="cyan")
+        table.add_column("评分", style="green")
+        
+        table.add_row("依赖管理", f"{score.dependency_score:.1f}")
+        table.add_row("耦合度", f"{score.coupling_score:.1f}")
+        table.add_row("复杂度", f"{score.complexity_score:.1f}")
+        table.add_row("设计质量", f"{score.design_score:.1f}")
+        
+        console.print(table)
+        
+        if score.issues:
+            console.print(f"\n[bold yellow]发现 {len(score.issues)} 个问题[/bold yellow]")
+            
+            for issue in score.issues[:10]:
+                severity_color = {
+                    "critical": "red",
+                    "high": "yellow",
+                    "medium": "cyan",
+                    "low": "blue",
+                }.get(issue.severity.value, "white")
+                
+                console.print(f"\n[{severity_color}]{issue.severity.value.upper()}[/{severity_color}] {issue.issue_type.value}")
+                console.print(f"  位置: {source_file.name}:{issue.line_number}")
+                console.print(f"  描述: {issue.description}")
+                
+                if show_refactoring:
+                    console.print(f"  [green]建议: {issue.refactoring_suggestion}[/green]")
+        
+        if show_refactoring and score.issues:
+            console.print("\n[bold cyan]🔧 重构建议[/bold cyan]")
+            advisor = RefactoringAdvisor()
+            report = advisor.generate_refactoring_report(score.issues)
+            
+            for refactoring in report["refactorings"][:5]:
+                console.print(f"\n[cyan]{refactoring['suggestion']['description']}[/cyan]")
+                for step in refactoring['suggestion']['applies_to']:
+                    console.print(f"  - {step}")
+
+
+@app.command(name="stability")
+def analyze_stability(
+    project: Path = typer.Argument(
+        ..., help="项目路径", exists=True, file_okay=False, dir_okay=True
+    ),
+    history_file: Optional[Path] = typer.Option(
+        None, "--history", "-h",
+        help="测试执行历史文件路径"
+    ),
+    runs: int = typer.Option(
+        5, "--runs", "-n",
+        help="稳定性检测运行次数"
+    ),
+    output_format: str = typer.Option(
+        "summary", "--output", "-o",
+        help="输出格式 (summary/json)"
+    ),
+) -> None:
+    """分析测试稳定性."""
+    from ut_agent.tools.flaky_detector import (
+        StabilityAnalyzer,
+        FlakyTestDetector,
+    )
+    
+    console.print(Panel.fit(
+        "[bold yellow]⚡ 测试稳定性分析[/bold yellow]",
+        border_style="yellow"
+    ))
+    
+    detector = FlakyTestDetector(
+        history_file=str(history_file) if history_file else None
+    )
+    
+    analyzer = StabilityAnalyzer(
+        str(project),
+        history_file=str(history_file) if history_file else None,
+    )
+    
+    flaky_tests = detector.detect_flaky_tests()
+    
+    if output_format == "json":
+        result = {
+            "total_flaky": len(flaky_tests),
+            "flaky_tests": [t.to_dict() for t in flaky_tests],
+        }
+        console.print_json(data=result)
+    else:
+        if flaky_tests:
+            console.print(f"\n[bold red]发现 {len(flaky_tests)} 个不稳定测试[/bold red]")
+            
+            for test in flaky_tests:
+                console.print(f"\n[yellow]⚠️ {test.test_class}.{test.test_method}[/yellow]")
+                console.print(f"  Flaky评分: {test.flaky_score:.2f}")
+                console.print(f"  通过/失败: {test.pass_count}/{test.fail_count}")
+                console.print(f"  原因: {', '.join(c.value for c in test.detected_causes)}")
+                
+                if test.suggested_fixes:
+                    console.print("  [green]修复建议:[/green]")
+                    for fix in test.suggested_fixes[:3]:
+                        console.print(f"    - {fix}")
+        else:
+            console.print("\n[bold green]✅ 未发现不稳定测试[/bold green]")
+
+
+@app.command(name="debt")
+def manage_debt(
+    project: Path = typer.Argument(
+        ..., help="项目路径", exists=True, file_okay=False, dir_okay=True
+    ),
+    action: str = typer.Argument(
+        "report", help="操作: report/add/resolve/summary"
+    ),
+    debt_type: Optional[str] = typer.Option(
+        None, "--type", "-t",
+        help="债务类型 (missing_tests/low_coverage/flaky_tests等)"
+    ),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d",
+        help="债务描述"
+    ),
+    priority: str = typer.Option(
+        "medium", "--priority", "-p",
+        help="优先级 (critical/high/medium/low)"
+    ),
+    debt_id: Optional[str] = typer.Option(
+        None, "--id",
+        help="债务ID (用于resolve操作)"
+    ),
+) -> None:
+    """管理测试债务."""
+    from ut_agent.tools.test_debt_tracker import (
+        TestDebtTracker,
+        DebtType,
+        DebtPriority,
+    )
+    
+    storage_path = str(project / ".ut-agent" / "debt")
+    tracker = TestDebtTracker(str(project), storage_path=storage_path)
+    
+    if action == "report":
+        console.print(Panel.fit(
+            "[bold red]📋 测试债务报告[/bold red]",
+            border_style="red"
+        ))
+        
+        report = tracker.get_debt_report()
+        
+        table = Table(box=box.ROUNDED)
+        table.add_column("指标", style="cyan")
+        table.add_column("值", style="green")
+        
+        table.add_row("总债务评分", f"{report.total_debt_score:.2f}")
+        table.add_row("总债务项", str(report.total_items))
+        table.add_row("待处理项", str(report.open_items))
+        table.add_row("关键项", str(report.critical_items))
+        
+        console.print(table)
+        
+        if report.recommendations:
+            console.print("\n[bold cyan]💡 建议[/bold cyan]")
+            for rec in report.recommendations:
+                console.print(f"  - {rec}")
+        
+    elif action == "add":
+        if not debt_type or not description:
+            console.print("[red]错误: add操作需要 --type 和 --description 参数[/red]")
+            raise typer.Exit(1)
+        
+        try:
+            dtype = DebtType(debt_type)
+            dpriority = DebtPriority(priority)
+        except ValueError as e:
+            console.print(f"[red]错误: 无效的债务类型或优先级 - {e}[/red]")
+            raise typer.Exit(1)
+        
+        item = tracker.add_debt_item(
+            debt_type=dtype,
+            file_path=str(project),
+            description=description,
+            impact_score=5.0,
+            priority=dpriority,
+        )
+        
+        console.print(f"[green]✓ 已添加债务项: {item.debt_id}[/green]")
+        
+    elif action == "resolve":
+        if not debt_id:
+            console.print("[red]错误: resolve操作需要 --id 参数[/red]")
+            raise typer.Exit(1)
+        
+        if tracker.resolve_debt(debt_id):
+            console.print(f"[green]✓ 已解决债务项: {debt_id}[/green]")
+        else:
+            console.print(f"[red]错误: 未找到债务项: {debt_id}[/red]")
+            raise typer.Exit(1)
+    
+    elif action == "summary":
+        summary = tracker.get_debt_summary()
+        console.print_json(data=summary)
+    
+    else:
+        console.print(f"[red]错误: 未知操作 '{action}'[/red]")
+        console.print("可用操作: report, add, resolve, summary")
+        raise typer.Exit(1)
+
+
+@app.command(name="quality")
+def analyze_quality(
+    test_file: Path = typer.Argument(
+        ..., help="测试文件路径", exists=True, file_okay=True, dir_okay=False
+    ),
+    source_file: Optional[Path] = typer.Option(
+        None, "--source", "-s",
+        help="对应源文件路径"
+    ),
+    mutation_report: Optional[Path] = typer.Option(
+        None, "--mutation", "-m",
+        help="变异测试报告路径 (JSON)"
+    ),
+    coverage_report: Optional[Path] = typer.Option(
+        None, "--coverage", "-c",
+        help="覆盖率报告路径 (JSON)"
+    ),
+    output_format: str = typer.Option(
+        "summary", "--output", "-o",
+        help="输出格式 (summary/json/detailed)"
+    ),
+) -> None:
+    """分析测试质量."""
+    from ut_agent.tools.enhanced_quality_scorer import EnhancedQualityScorer
+    import json
+    
+    console.print(Panel.fit(
+        "[bold green]📊 测试质量分析[/bold green]",
+        border_style="green"
+    ))
+    
+    with open(test_file, 'r', encoding='utf-8') as f:
+        test_code = f.read()
+    
+    source_code = ""
+    if source_file and source_file.exists():
+        with open(source_file, 'r', encoding='utf-8') as f:
+            source_code = f.read()
+    
+    mutation_data = None
+    if mutation_report and mutation_report.exists():
+        with open(mutation_report, 'r', encoding='utf-8') as f:
+            mutation_data = json.load(f)
+    
+    coverage_data = None
+    if coverage_report and coverage_report.exists():
+        with open(coverage_report, 'r', encoding='utf-8') as f:
+            coverage_data = json.load(f)
+    
+    scorer = EnhancedQualityScorer()
+    report = scorer.generate_comprehensive_report(
+        test_code=test_code,
+        source_code=source_code,
+        test_file=str(test_file),
+        source_file=str(source_file) if source_file else None,
+        mutation_report=mutation_data,
+        coverage_report=coverage_data,
+    )
+    
+    if output_format == "json":
+        console.print_json(data=report.to_dict())
+    else:
+        console.print(f"\n[bold]整体质量评分: {report.overall_score:.1f}/100 ({report.grade})[/bold]")
+        
+        table = Table(box=box.ROUNDED)
+        table.add_column("维度", style="cyan")
+        table.add_column("评分", style="green")
+        table.add_column("状态", style="yellow")
+        
+        scores = [
+            ("有效性", report.effectiveness_score),
+            ("代码质量", report.code_quality_score),
+            ("覆盖深度", report.coverage_depth_score),
+            ("变异测试", report.mutation_score),
+            ("稳定性", report.stability_score),
+            ("可测试性", report.testability_score),
+        ]
+        
+        for name, score in scores:
+            status = "✓" if score >= 70 else "⚠" if score >= 50 else "✗"
+            table.add_row(name, f"{score:.1f}", status)
+        
+        console.print(table)
+        
+        if report.critical_issues:
+            console.print(f"\n[bold red]🚨 关键问题[/bold red]")
+            for issue in report.critical_issues:
+                console.print(f"  - {issue}")
+        
+        if report.recommendations:
+            console.print(f"\n[bold cyan]💡 改进建议[/bold cyan]")
+            for rec in report.recommendations:
+                console.print(f"  - {rec}")
+        
+        if report.improvement_priorities:
+            console.print(f"\n[bold yellow]🎯 优先改进项[/bold yellow]")
+            for item in report.improvement_priorities:
+                console.print(f"  {item['priority']}. {item['action']} (当前: {item['current_score']:.1f}, 目标: {item['target_score']})")
+
+
 async def run_generation_workflow(
     project_path: str,
     project_type: str,

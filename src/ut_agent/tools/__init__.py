@@ -8,6 +8,50 @@ from ut_agent.tools.coverage_analyzer import (
     parse_istanbul_report,
     identify_coverage_gaps,
 )
+from ut_agent.tools.sbst_generator import (
+    SBSTEngine,
+    HybridTestGenerator,
+    SBSTConfiguration,
+    SearchStrategy,
+    TestCase as SBSTTestCase,
+)
+from ut_agent.tools.symbolic_executor import (
+    SymbolicExecutor,
+    TestValidator,
+    HybridValidator,
+    SymbolicExecutionResult,
+)
+from ut_agent.tools.testability_analyzer import (
+    TestabilityAnalyzer,
+    TestabilityScore,
+    TestabilityIssue,
+    RefactoringAdvisor,
+)
+from ut_agent.tools.flaky_detector import (
+    FlakyTestDetector,
+    StabilityAnalyzer,
+    TestQuarantine,
+    FlakyTest,
+    StabilityReport,
+)
+from ut_agent.tools.test_debt_tracker import (
+    TestDebtTracker,
+    TestDebtItem,
+    DebtReport,
+    DebtType,
+    DebtPriority,
+)
+from ut_agent.tools.pr_integration import (
+    GitHubClient,
+    PRTestAnalyzer,
+    PRAutomationBot,
+    PRWebhookHandler,
+)
+from ut_agent.tools.enhanced_quality_scorer import (
+    EnhancedQualityScorer,
+    EnhancedQualityReport,
+    create_quality_report,
+)
 
 __all__ = [
     "detect_project_type",
@@ -19,4 +63,34 @@ __all__ = [
     "parse_jacoco_report",
     "parse_istanbul_report",
     "identify_coverage_gaps",
+    "SBSTEngine",
+    "HybridTestGenerator",
+    "SBSTConfiguration",
+    "SearchStrategy",
+    "SBSTTestCase",
+    "SymbolicExecutor",
+    "TestValidator",
+    "HybridValidator",
+    "SymbolicExecutionResult",
+    "TestabilityAnalyzer",
+    "TestabilityScore",
+    "TestabilityIssue",
+    "RefactoringAdvisor",
+    "FlakyTestDetector",
+    "StabilityAnalyzer",
+    "TestQuarantine",
+    "FlakyTest",
+    "StabilityReport",
+    "TestDebtTracker",
+    "TestDebtItem",
+    "DebtReport",
+    "DebtType",
+    "DebtPriority",
+    "GitHubClient",
+    "PRTestAnalyzer",
+    "PRAutomationBot",
+    "PRWebhookHandler",
+    "EnhancedQualityScorer",
+    "EnhancedQualityReport",
+    "create_quality_report",
 ]

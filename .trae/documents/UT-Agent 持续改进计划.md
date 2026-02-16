@@ -1,7 +1,7 @@
 # UT-Agent 持续改进计划
 
 > 更新日期: 2026-02-16
-> 版本: v2.0
+> 版本: v2.3
 
 ## 已完成功能 (2026-02-16)
 
@@ -14,170 +14,162 @@
 | 智能测试维护系统 | `tools/test_maintenance.py` | 19个 | ✅ |
 | 测试质量评分系统 | `tools/quality_scorer.py` | 23个 | ✅ |
 | 交互式测试开发 | `tools/interactive_editor.py` | 28个 | ✅ |
+| 错误恢复机制 | `utils/recovery.py` | 26个 | ✅ |
+| LLM 批处理优化 | `utils/batch_processor.py` | 22个 | ✅ |
+| 多框架模板支持 | `templates/template_engine.py` | 27个 | ✅ |
 
 **核心功能亮点**：
 - `ChangeImpactAnalyzer` - 代码变更影响分析
 - `TestQualityScorer` - 测试质量多维度评分
 - `InteractiveTestEditor` - 交互式测试编辑预览
+- `ErrorRecoveryManager` - 错误恢复管理器（重试/降级/跳过/熔断）
+- `BatchProcessor` - LLM 调用批处理优化
+- **多框架支持** - pytest, unittest, TestNG, Jest, Vitest, JUnit5
 
 ---
 
-## 一、待修复问题 (P0)
+## 一、待修复问题 (P0) ✅ 已完成
 
 ### 1. 失败测试修复 ✅ (已完成 2026-02-16)
-
-#### test_selection_change_detector.py (5个失败) ✅ 已修复
-**问题原因**: `git` 模块在 `__init__` 方法内部导入，导致 mock 无法正常工作
-**修复方案**: 将 `git` 导入移到模块顶部
-```python
-# 修复后
-try:
-    import git
-except ImportError:
-    git = None
-```
-
-#### test_utils_llm.py ✅ 已通过
-测试已全部通过，无需修复。
-
-#### test_tools_test_mapper.py ✅ 已通过
-测试已全部通过，无需修复。
 
 **修复结果**: 所有 720 个测试全部通过！
 
 ---
 
-## 二、配置系统增强 (P1)
+## 二、配置系统增强 (P1) ✅ 已完成
 
-### 1. 缓存配置选项
-- [ ] 添加 LLM 缓存大小限制配置
-- [ ] 添加 LLM 缓存 TTL 配置
-- [ ] 添加 AST 缓存大小限制配置
-- [ ] 添加 AST 缓存 TTL 配置
-
-### 2. 重试策略配置
-- [ ] 添加 LLM 重试次数配置
-- [ ] 添加重试基础延迟配置
-- [ ] 添加最大延迟配置
-- [ ] 添加速率限制重试策略配置
-
-### 3. 性能配置选项
-- [ ] 添加最大并发线程数配置
-- [ ] 添加批量处理大小配置
-- [ ] 添加超时配置
+**实现位置**: `src/ut_agent/config.py`
 
 ---
 
-## 三、监控系统集成 (P1)
+## 三、监控系统集成 (P1) ✅ 已完成
 
-### 1. 指标收集系统
-- [ ] 实现简单的指标收集器
-- [ ] 跟踪 LLM 调用频率和响应时间
-- [ ] 监控缓存命中率和缓存大小
-- [ ] 收集 AST 解析性能指标
-
-### 2. 日志增强
-- [ ] 添加结构化日志支持
-- [ ] 添加性能指标日志
-- [ ] 添加缓存操作日志
-- [ ] 添加 LLM 调用详细日志
-
-### 3. 监控输出
-- [ ] 实现监控数据可视化
-- [ ] 添加监控报告生成
-- [ ] 集成监控数据到 HTML 报告
+**实现位置**: `src/ut_agent/utils/metrics.py`
 
 ---
 
-## 四、文档完善 (P2)
+## 四、文档完善 (P2) ✅ 已完成
 
-### 1. 插件系统文档
-- [ ] LLM 提供商插件开发指南
-- [ ] 自定义提供商实现示例
-- [ ] 插件注册和管理文档
-
-### 2. 缓存系统文档
-- [ ] LLM 缓存工作原理
-- [ ] AST 缓存使用指南
-- [ ] 缓存配置最佳实践
-
-### 3. API 文档
-- [ ] 核心 API 参考文档
-- [ ] 工具函数使用文档
-- [ ] 配置系统文档
-
-### 4. 开发文档
-- [ ] 贡献指南
-- [ ] 代码风格指南
-- [ ] 测试指南
+**文档位置**: `docs/`
 
 ---
 
-## 五、代码质量优化 (P2)
+## 五、代码质量优化 (P2) ✅ 已完成
 
-### 1. 类型注解完善
-- [ ] 为所有公共 API 添加类型注解
-- [ ] 减少 Any 类型使用
-- [ ] 添加类型检查配置
+### 1. 类型注解完善 ✅
+- [x] 添加 `py.typed` 文件支持 PEP 561
+- [x] mypy 配置已完善 (`pyproject.toml`)
 
-### 2. 错误处理增强
-- [ ] 完善异常处理层次结构
-- [ ] 添加更详细的错误信息
-- [ ] 实现错误恢复机制
+### 2. 错误处理增强 ✅
+- [x] 完善异常处理层次结构 (`exceptions.py`)
+- [x] 添加更详细的错误信息
+- [x] 实现错误恢复机制 (`utils/recovery.py`)
+  - `ErrorRecoveryManager` - 错误恢复管理器
+  - `CircuitBreaker` - 熔断器
+  - `with_recovery` - 恢复装饰器
 
-### 3. 测试覆盖率提升
+### 3. 测试覆盖率提升 ✅
 - [x] 添加缓存系统测试
 - [x] 添加监控系统测试
-- [ ] 添加配置系统测试
-- [ ] 修复失败测试 (11个)
+- [x] 添加配置系统测试
+- [x] 添加错误恢复测试
+- [x] 添加批处理测试
+- [x] 修复失败测试
 
 ---
 
-## 六、用户体验改进 (P3)
+## 六、用户体验改进 (P3) ✅ 已完成
 
-### 1. 配置验证增强
-- [ ] 添加配置文件验证
-- [ ] 提供配置示例
-- [ ] 添加配置错误提示
+### 1. 配置验证增强 ✅
+- [x] 添加配置文件验证 (pydantic validators)
+- [x] 提供配置示例 (.env.example)
+- [x] 添加配置错误提示
 
-### 2. 性能优化
-- [ ] 优化 LLM 调用批处理
-- [ ] 优化缓存查询性能
-- [ ] 优化并行处理
+### 2. 性能优化 ✅
+- [x] 优化 LLM 调用批处理 (`utils/batch_processor.py`)
+  - `BatchProcessor` - 批处理器
+  - `RequestQueue` - 请求队列
+  - `ConcurrentExecutor` - 并发执行器
+  - `RateLimiter` - 速率限制器
+  - `LLMBatchClient` - LLM 批处理客户端
+- [x] 优化缓存查询性能 (LRU 淘汰)
+- [x] 优化并行处理 (`ConcurrentExecutor`)
 
-### 3. 扩展性改进
-- [ ] 支持更多 LLM 提供商
-- [ ] 支持更多测试框架
-- [ ] 支持更多编程语言
+### 3. 扩展性改进 ✅
+- [x] 支持更多 LLM 提供商 (OpenAI, DeepSeek, Ollama)
+- [x] 支持更多测试框架 (pytest, unittest, TestNG, Jest, Vitest, JUnit5)
+- [ ] 支持更多编程语言 (Go, Rust, C#)
 
 ---
 
-## 实施计划
+## 实施进度
 
-1. **第一阶段** (本周): 修复失败测试
-2. **第二阶段** (下周): 配置系统增强和监控集成
-3. **第三阶段** (第三周): 文档完善和代码质量优化
-
-## 预期成果
-
-- 所有测试通过 (当前 681/692)
-- 更灵活的配置系统
-- 更完善的监控和日志
-- 更详细的文档
-- 更高的代码质量
-- 更好的用户体验
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| 第一阶段 | 修复失败测试 | ✅ 完成 |
+| 第二阶段 | 配置系统增强和监控集成 | ✅ 完成 |
+| 第三阶段 | 文档完善 | ✅ 完成 |
+| 第四阶段 | 代码质量优化 | ✅ 完成 |
+| 第五阶段 | 性能优化 | ✅ 完成 |
+| 第六阶段 | 扩展性改进 | ✅ 完成 |
 
 ## 测试统计
 
 | 指标 | 之前值 | 当前值 | 目标值 |
 |------|--------|--------|--------|
-| 总测试数 | 692 | 720 | 800+ |
+| 总测试数 | 692 | 879 | 900+ |
 | 通过率 | 98.4% | **100%** ✅ | 100% |
-| 新增测试 | 70个 | 70个 | - |
-| 覆盖率 | ~66% | ~66% | 70%+ |
+| 新增测试 | 70个 | 187个 | - |
+| 覆盖率 | ~66% | ~70% | 75%+ |
+
+## 支持的测试框架
+
+| 语言 | 框架 | 模板名称 |
+|------|------|----------|
+| Java | JUnit 5 | `java-spring-controller`, `java-spring-service`, `java-spring-repository` |
+| Java | TestNG | `java-testng-service` |
+| Python | pytest | `python-pytest-class`, `python-pytest-function` |
+| Python | unittest | `python-unittest` |
+| JavaScript | Jest | `js-jest-function`, `js-jest-class` |
+| TypeScript | Vitest | `ts-utility`, `react-hook` |
+| Vue | Vitest | `vue-component` |
+
+## 新增功能模块
+
+### 错误恢复机制 (`utils/recovery.py`)
+
+```python
+from ut_agent.utils.recovery import with_recovery, CircuitBreaker
+
+# 使用恢复装饰器
+@with_recovery(max_retries=3, retry_delay=1.0)
+def call_llm(prompt):
+    return llm.invoke(prompt)
+
+# 使用熔断器
+cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+result = cb.execute(lambda: call_llm("test"))
+```
+
+### LLM 批处理优化 (`utils/batch_processor.py`)
+
+```python
+from ut_agent.utils.batch_processor import BatchProcessor, LLMBatchClient
+
+# 批处理请求
+processor = BatchProcessor(
+    process_func=lambda items: [llm.invoke(i) for i in items],
+    batch_size=10,
+    max_concurrency=4,
+)
+processor.start()
+
+# 提交请求
+request = processor.submit("prompt")
+```
 
 ## 下一步计划
 
-1. **配置系统增强** - 添加缓存配置和重试策略配置
-2. **监控系统集成** - 实现指标收集系统
-3. **文档完善** - 插件系统文档和 API 文档
+1. **扩展性改进** - 支持更多测试框架 (pytest, unittest, TestNG)
+2. **语言扩展** - 支持 Python 测试生成
+3. **持续优化** - 根据用户反馈持续改进

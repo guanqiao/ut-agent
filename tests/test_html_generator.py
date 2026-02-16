@@ -8,9 +8,12 @@ from unittest.mock import Mock, patch
 
 from ut_agent.reporting.html_generator import (
     HTMLReportGenerator,
+    generate_coverage_report,
+)
+from ut_agent.reporting.html_templates import (
     FileCoverage,
     ReportData,
-    generate_coverage_report,
+    HTMLTemplates,
 )
 from ut_agent.graph.state import CoverageReport, CoverageGap
 
@@ -62,6 +65,113 @@ class TestReportData:
         assert len(report_data.gaps) == 0
 
 
+class TestHTMLTemplates:
+    """HTMLTemplates测试类."""
+
+    def test_get_coverage_class_high(self):
+        """测试高覆盖率CSS类."""
+        assert HTMLTemplates.get_coverage_class(85) == "coverage-high"
+        assert HTMLTemplates.get_coverage_class(80) == "coverage-high"
+
+    def test_get_coverage_class_medium(self):
+        """测试中等覆盖率CSS类."""
+        assert HTMLTemplates.get_coverage_class(70) == "coverage-medium"
+        assert HTMLTemplates.get_coverage_class(60) == "coverage-medium"
+
+    def test_get_coverage_class_low(self):
+        """测试低覆盖率CSS类."""
+        assert HTMLTemplates.get_coverage_class(50) == "coverage-low"
+        assert HTMLTemplates.get_coverage_class(30) == "coverage-low"
+
+    def test_render_header(self):
+        """测试渲染页头."""
+        now = datetime.now()
+        html = HTMLTemplates.render_header("TestProject", now)
+        assert "TestProject" in html
+        assert "UT-Agent" in html
+
+    def test_render_summary_cards(self):
+        """测试渲染摘要卡片."""
+        report_data = ReportData(
+            project_name="TestProject",
+            generated_at=datetime.now(),
+            overall_coverage=85.0,
+            line_coverage=90.0,
+            branch_coverage=80.0,
+            method_coverage=95.0,
+            class_coverage=85.0,
+            total_lines=1000,
+            covered_lines=900,
+            total_branches=200,
+            covered_branches=160,
+        )
+
+        html = HTMLTemplates.render_summary_cards(report_data)
+
+        assert "85.0%" in html
+        assert "90.0%" in html
+        assert "80.0%" in html
+        assert "95.0%" in html
+        assert "coverage-high" in html
+
+    def test_render_file_table(self):
+        """测试渲染文件表格."""
+        files = [
+            FileCoverage(
+                file_path="src/Main.java",
+                line_coverage=90.0,
+                branch_coverage=85.0,
+                total_lines=100,
+                covered_lines=90,
+            ),
+            FileCoverage(
+                file_path="src/Utils.java",
+                line_coverage=50.0,
+                branch_coverage=40.0,
+                total_lines=50,
+                covered_lines=25,
+            ),
+        ]
+
+        html = HTMLTemplates.render_file_table(files)
+
+        assert "src/Main.java" in html
+        assert "src/Utils.java" in html
+        assert "90.0%" in html
+        assert "50.0%" in html
+        assert "badge-success" in html
+        assert "badge-danger" in html
+
+    def test_render_gaps_section(self):
+        """测试渲染缺口部分."""
+        gaps = [
+            CoverageGap(
+                file_path="src/Main.java",
+                line_number=10,
+                line_content="public void test() {}",
+                gap_type="line",
+            ),
+            CoverageGap(
+                file_path="src/Utils.java",
+                line_number=20,
+                line_content="if (condition) {",
+                gap_type="branch",
+            ),
+        ]
+
+        html = HTMLTemplates.render_gaps_section(gaps)
+
+        assert "src/Main.java" in html
+        assert "src/Utils.java" in html
+        assert "public void test() {}" in html
+        assert "gap-item" in html
+
+    def test_render_gaps_section_empty(self):
+        """测试渲染空缺口部分."""
+        html = HTMLTemplates.render_gaps_section([])
+        assert html == ""
+
+
 class TestHTMLReportGenerator:
     """HTMLReportGenerator测试类."""
 
@@ -109,7 +219,6 @@ class TestHTMLReportGenerator:
         assert "coverage_report_" in report_path
         assert report_path.endswith(".html")
 
-        # 验证文件内容
         content = Path(report_path).read_text(encoding="utf-8")
         assert "TestProject" in content
         assert "80.0" in content
@@ -143,7 +252,6 @@ class TestHTMLReportGenerator:
         """测试保存和加载历史数据."""
         generator = HTMLReportGenerator(str(tmp_path))
 
-        # 创建报告数据
         report_data = ReportData(
             project_name="TestProject",
             generated_at=datetime.now(),
@@ -158,10 +266,8 @@ class TestHTMLReportGenerator:
             covered_branches=150,
         )
 
-        # 保存历史
         generator._save_report_data(report_data, "20240101_120000")
 
-        # 加载历史
         history = generator._load_history()
 
         assert len(history) == 1
@@ -172,7 +278,6 @@ class TestHTMLReportGenerator:
         """测试历史记录限制."""
         generator = HTMLReportGenerator(str(tmp_path))
 
-        # 创建25条历史记录
         for i in range(25):
             report_data = ReportData(
                 project_name="TestProject",
@@ -189,12 +294,9 @@ class TestHTMLReportGenerator:
             )
             generator._save_report_data(report_data, f"20240101_{i:06d}")
 
-        # 加载历史
         history = generator._load_history()
 
-        # 应该只保留最近20条
         assert len(history) == 20
-        # 最新的记录应该是24
         assert history[-1]["overall_coverage"] == 24.0
 
     def test_parse_file_coverage(self, tmp_path):
@@ -229,122 +331,12 @@ class TestHTMLReportGenerator:
         files = generator._parse_file_coverage(coverage_report)
 
         assert len(files) == 2
-        # 文件按覆盖率排序（低到高），所以 Utils.java (70%) 在 Main.java (90%) 之前
         assert files[0].file_path == "src/Utils.java"
         assert files[0].line_coverage == 70
         assert files[1].file_path == "src/Main.java"
         assert files[1].line_coverage == 90
 
-    def test_generate_summary_cards(self, tmp_path):
-        """测试生成摘要卡片."""
-        generator = HTMLReportGenerator(str(tmp_path))
-
-        report_data = ReportData(
-            project_name="TestProject",
-            generated_at=datetime.now(),
-            overall_coverage=85.0,
-            line_coverage=90.0,
-            branch_coverage=80.0,
-            method_coverage=95.0,
-            class_coverage=85.0,
-            total_lines=1000,
-            covered_lines=900,
-            total_branches=200,
-            covered_branches=160,
-        )
-
-        html = generator._generate_summary_cards(report_data)
-
-        assert "85.0%" in html
-        assert "90.0%" in html
-        assert "80.0%" in html
-        assert "95.0%" in html
-        assert "coverage-high" in html
-
-    def test_generate_file_table(self, tmp_path):
-        """测试生成文件表格."""
-        generator = HTMLReportGenerator(str(tmp_path))
-
-        report_data = ReportData(
-            project_name="TestProject",
-            generated_at=datetime.now(),
-            overall_coverage=80.0,
-            line_coverage=85.0,
-            branch_coverage=75.0,
-            method_coverage=90.0,
-            class_coverage=80.0,
-            total_lines=1000,
-            covered_lines=850,
-            total_branches=200,
-            covered_branches=150,
-            files=[
-                FileCoverage(
-                    file_path="src/Main.java",
-                    line_coverage=90.0,
-                    branch_coverage=85.0,
-                    total_lines=100,
-                    covered_lines=90,
-                ),
-                FileCoverage(
-                    file_path="src/Utils.java",
-                    line_coverage=50.0,
-                    branch_coverage=40.0,
-                    total_lines=50,
-                    covered_lines=25,
-                ),
-            ],
-        )
-
-        html = generator._generate_file_table(report_data)
-
-        assert "src/Main.java" in html
-        assert "src/Utils.java" in html
-        assert "90.0%" in html
-        assert "50.0%" in html
-        assert "badge-success" in html
-        assert "badge-danger" in html
-
-    def test_generate_gaps_section(self, tmp_path):
-        """测试生成缺口部分."""
-        generator = HTMLReportGenerator(str(tmp_path))
-
-        report_data = ReportData(
-            project_name="TestProject",
-            generated_at=datetime.now(),
-            overall_coverage=80.0,
-            line_coverage=85.0,
-            branch_coverage=75.0,
-            method_coverage=90.0,
-            class_coverage=80.0,
-            total_lines=1000,
-            covered_lines=850,
-            total_branches=200,
-            covered_branches=150,
-            gaps=[
-                CoverageGap(
-                    file_path="src/Main.java",
-                    line_number=10,
-                    line_content="public void test() {}",
-                    gap_type="line",
-                ),
-                CoverageGap(
-                    file_path="src/Utils.java",
-                    line_number=20,
-                    line_content="if (condition) {",
-                    gap_type="branch",
-                ),
-            ],
-        )
-
-        html = generator._generate_gaps_section(report_data)
-
-        assert "src/Main.java" in html
-        assert "src/Utils.java" in html
-        assert "public void test() {}" in html
-        assert "if (condition) {" in html
-        assert "gap-item" in html
-
-    def test_generate_trend_chart_with_history(self, tmp_path):
+    def test_render_trend_chart_with_history(self, tmp_path):
         """测试生成趋势图（有历史数据）."""
         generator = HTMLReportGenerator(str(tmp_path))
 
@@ -367,15 +359,14 @@ class TestHTMLReportGenerator:
             ],
         )
 
-        html = generator._generate_trend_chart(report_data)
+        html = generator._render_trend_chart(report_data)
 
         assert "trendChart" in html
-        # Chart.js 在HTML头部引入，不在此函数中
         assert "20240101_120000" in html
         assert "总体覆盖率" in html
         assert "行覆盖率" in html
 
-    def test_generate_trend_chart_without_history(self, tmp_path):
+    def test_render_trend_chart_without_history(self, tmp_path):
         """测试生成趋势图（无历史数据）."""
         generator = HTMLReportGenerator(str(tmp_path))
 
@@ -394,9 +385,8 @@ class TestHTMLReportGenerator:
             history=[],
         )
 
-        html = generator._generate_trend_chart(report_data)
+        html = generator._render_trend_chart(report_data)
 
-        # 无历史数据时应该返回空字符串
         assert html == ""
 
 

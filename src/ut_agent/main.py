@@ -415,6 +415,72 @@ def show_config() -> None:
     console.print(table)
 
 
+@app.command(name="metrics")
+def show_metrics() -> None:
+    """显示当前监控指标."""
+    from ut_agent.utils.metrics import get_metrics_summary, log_metrics_summary
+    
+    console.print(Panel.fit(
+        "[bold green]📊 监控指标[/bold green]",
+        border_style="green"
+    ))
+
+    metrics = get_metrics_summary()
+    
+    # 打印 LLM 指标
+    llm_metrics = metrics.get("llm", {})
+    if llm_metrics:
+        console.print("\n[bold cyan]LLM Metrics[/bold cyan]")
+        table = Table(box=box.ROUNDED)
+        table.add_column("指标", style="cyan")
+        table.add_column("值", style="green")
+        
+        for key, value in llm_metrics.items():
+            if isinstance(value, dict) and "value" in value:
+                table.add_row(value.get("name", key), str(value.get("value")))
+            elif isinstance(value, dict) and "summary" in value:
+                table.add_row(value.get("name", key), "")
+                summary = value.get("summary", {})
+                for stat_name, stat_value in summary.items():
+                    table.add_row(f"  {stat_name}", f"{stat_value:.2f}")
+        
+        console.print(table)
+    
+    # 打印缓存指标
+    cache_metrics = metrics.get("cache", {})
+    if cache_metrics:
+        console.print("\n[bold cyan]Cache Metrics[/bold cyan]")
+        table = Table(box=box.ROUNDED)
+        table.add_column("指标", style="cyan")
+        table.add_column("值", style="green")
+        
+        for key, value in cache_metrics.items():
+            if isinstance(value, dict) and "value" in value:
+                table.add_row(value.get("name", key), str(value.get("value")))
+        
+        console.print(table)
+    
+    # 打印性能指标
+    perf_metrics = metrics.get("performance", {})
+    if perf_metrics:
+        console.print("\n[bold cyan]Performance Metrics[/bold cyan]")
+        table = Table(box=box.ROUNDED)
+        table.add_column("指标", style="cyan")
+        table.add_column("值", style="green")
+        
+        for key, value in perf_metrics.items():
+            if isinstance(value, dict) and "summary" in value:
+                table.add_row(value.get("name", key), "")
+                summary = value.get("summary", {})
+                for stat_name, stat_value in summary.items():
+                    table.add_row(f"  {stat_name}", f"{stat_value:.2f}")
+        
+        console.print(table)
+    
+    # 记录到日志
+    log_metrics_summary()
+
+
 async def run_generation_workflow(
     project_path: str,
     project_type: str,

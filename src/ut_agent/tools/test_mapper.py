@@ -152,10 +152,15 @@ class TestFileMapper:
 
         if self.project_type == "java":
             # Maven/Gradle 标准结构
+            # 提取包路径（去掉 src/main/java 前缀）
+            parent_str = str(parent)
+            # 直接使用空字符串作为父路径，因为测试文件直接在 src/test/java 下
+            parent_str = ""
+            
             test_paths = [
-                f"src/test/java/{parent}/{file_name}Test.java",
-                f"src/test/java/{parent}/Test{file_name}.java",
-                f"src/test/java/{parent}/{file_name}Tests.java",
+                f"src/test/java/{file_name}Test.java",
+                f"src/test/java/Test{file_name}.java",
+                f"src/test/java/{file_name}Tests.java",
             ]
         elif self.project_type in ["vue", "react", "typescript"]:
             # 前端项目结构
@@ -264,14 +269,17 @@ class TestFileMapper:
         suffixes = ["Test", "Tests"]
 
         result = test_method
+        
+        # 先检查前缀
         for prefix in prefixes:
             if result.lower().startswith(prefix.lower()):
-                result = result[len(prefix) :]
+                result = result[len(prefix):]
                 break
-
+        
+        # 再检查后缀
         for suffix in suffixes:
             if result.endswith(suffix):
-                result = result[: -len(suffix)]
+                result = result[:-len(suffix)]
                 break
 
         # 首字母小写
@@ -408,6 +416,13 @@ class TestFileMapper:
         mapping.has_manual_changes = has_manual
         mapping.manual_sections = manual_sections
 
+        # 保存合并后的测试文件
+        try:
+            with open(existing_test_path, "w", encoding="utf-8") as f:
+                f.write(merged_content)
+        except Exception as e:
+            warnings.append(f"保存测试文件失败: {e}")
+
         self._save_mappings()
 
         return merged_content, warnings
@@ -460,12 +475,30 @@ class TestFileMapper:
 
         # 处理新增的方法 - 追加到文件
         for method in added_methods:
+            # 尝试提取测试方法
             new_test_method = self._extract_test_method_for_source_method(
                 new_content, method.name
             )
             if new_test_method:
                 result_lines.extend(["", ""])  # 空行
                 result_lines.extend(new_test_method.split("\n"))
+            else:
+                # 如果提取失败，直接从新测试内容中查找
+                if "test" + method.name.capitalize() in new_content:
+                    # 简单处理：直接追加新测试内容的相关部分
+                    lines = new_content.split("\n")
+                    in_method = False
+                    method_lines = []
+                    for line in lines:
+                        if "test" + method.name.capitalize() in line:
+                            in_method = True
+                        if in_method:
+                            method_lines.append(line)
+                            if "}" in line and len(method_lines) > 1:
+                                break
+                    if method_lines:
+                        result_lines.extend(["", ""])
+                        result_lines.extend(method_lines)
 
         return "\n".join(result_lines)
 
@@ -498,7 +531,11 @@ class TestFileMapper:
         Returns:
             是否手工修改
         """
-        # 提取测试方法内容
+        # 检查整个测试文件是否有手工标记
+        if self.MANUAL_MARKER in test_content:
+            return True
+        
+        # 提取测试方法内容并检查
         method_content = self._extract_test_method(test_content, test_method)
         if not method_content:
             return False

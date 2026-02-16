@@ -2,44 +2,10 @@
 
 import re
 import subprocess
-from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-
-class ChangeType(Enum):
-    """变更类型."""
-
-    ADDED = "added"
-    MODIFIED = "modified"
-    DELETED = "deleted"
-    RENAMED = "renamed"
-
-
-@dataclass
-class CodeChange:
-    """代码变更信息."""
-
-    file_path: str
-    change_type: ChangeType
-    old_path: Optional[str] = None
-    line_range: Tuple[int, int] = field(default_factory=lambda: (0, 0))
-    diff_content: str = ""
-    added_lines: List[int] = field(default_factory=list)
-    deleted_lines: List[int] = field(default_factory=list)
-
-
-@dataclass
-class MethodChange:
-    """方法级变更信息."""
-
-    file_path: str
-    method_name: str
-    change_type: ChangeType
-    signature: str = ""
-    line_start: int = 0
-    line_end: int = 0
+from ut_agent.models.common import ChangeType, CodeChange, MethodChange
 
 
 class GitAnalyzer:
@@ -101,17 +67,13 @@ class GitAnalyzer:
         """
         changes = []
 
-        # 获取diff统计
         if base_ref or head_ref:
-            # 比较两个引用
             base = base_ref or "HEAD~1"
             head = head_ref or "HEAD"
             diff_stat = self._run_git_command(["diff", "--stat", f"{base}...{head}"])
         else:
-            # 获取工作区变更
             diff_stat = self._run_git_command(["diff", "--stat", "HEAD"])
 
-        # 解析diff统计
         for line in diff_stat.strip().split("\n"):
             if "|" in line:
                 parts = line.split("|")
@@ -122,7 +84,6 @@ class GitAnalyzer:
                         if change:
                             changes.append(change)
 
-        # 获取未跟踪文件
         if include_untracked:
             untracked = self._get_untracked_files()
             changes.extend(untracked)
@@ -178,7 +139,6 @@ class GitAnalyzer:
 
         for line in diff_content.split("\n"):
             if line.startswith("@@"):
-                # 解析hunk头
                 match = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
                 if match:
                     current_line = int(match.group(2))
@@ -190,7 +150,6 @@ class GitAnalyzer:
             elif not line.startswith("\\"):
                 current_line += 1
 
-        # 确定变更类型
         if not added_lines and not deleted_lines:
             change_type = ChangeType.MODIFIED
         elif not deleted_lines:
@@ -200,7 +159,6 @@ class GitAnalyzer:
         else:
             change_type = ChangeType.MODIFIED
 
-        # 计算行范围
         all_lines = added_lines + deleted_lines
         line_range = (min(all_lines), max(all_lines)) if all_lines else (0, 0)
 
@@ -326,7 +284,6 @@ def filter_source_files(
     filtered = []
     for change in changes:
         if any(change.file_path.endswith(ext) for ext in extensions):
-            # 排除测试文件
             if "test" not in change.file_path.lower() and "spec" not in change.file_path.lower():
                 filtered.append(change)
 
@@ -349,7 +306,6 @@ def get_changed_methods(
     method_changes = []
 
     for change in changes:
-        # 获取变更前后的内容
         old_content = git_analyzer.get_file_at_ref(change.file_path, "HEAD~1")
         new_content = None
 
@@ -361,13 +317,10 @@ def get_changed_methods(
             except Exception:
                 pass
 
-        # 分析方法变更
         if old_content and new_content:
-            # 对比分析方法
             old_methods = _extract_methods(old_content)
             new_methods = _extract_methods(new_content)
 
-            # 检测新增方法
             for method_name, method_info in new_methods.items():
                 if method_name not in old_methods:
                     method_changes.append(
@@ -392,7 +345,6 @@ def get_changed_methods(
                         )
                     )
 
-            # 检测删除的方法
             for method_name, method_info in old_methods.items():
                 if method_name not in new_methods:
                     method_changes.append(
@@ -421,9 +373,6 @@ def _extract_methods(content: str) -> dict:
     methods = {}
     lines = content.split("\n")
 
-    # 简单的正则匹配方法签名
-    # Java: public|private|protected [static] [final] ReturnType methodName(...)
-    # TypeScript: function|const|async function|methodName(...)
     method_pattern = re.compile(
         r"^\s*(?:public|private|protected)?\s*(?:static|final)?\s*"
         r"(?:[\w<>\[\]]+\s+)?(\w+)\s*\([^)]*\)\s*(?:throws\s+\w+)?\s*\{"

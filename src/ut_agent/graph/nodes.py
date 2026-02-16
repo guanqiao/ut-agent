@@ -2,11 +2,12 @@
 
 import asyncio
 import os
+import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 from langchain_core.runnables import RunnableConfig
 from ut_agent.graph.state import (
-    AgentState, TestFile, CoverageGap, CodeChange, ChangeSummary,
+    AgentState, GeneratedTestFile, CoverageGap, CodeChange, ChangeSummary,
 )
 from ut_agent.tools.project_detector import detect_project_type, find_source_files
 from ut_agent.tools.code_analyzer import analyze_java_file, analyze_ts_file
@@ -22,8 +23,25 @@ from ut_agent.tools.change_detector import create_change_detector
 from ut_agent.tools.test_mapper import TestFileMapper
 from ut_agent.reporting.html_generator import generate_coverage_report
 from ut_agent.models import get_llm
+from ut_agent.utils import get_logger
 
-MAX_CONCURRENT_GENERATIONS = 4
+
+def get_optimal_thread_count() -> int:
+    """获取最优线程数.
+
+    根据 CPU 核心数和 I/O 密集型任务特点计算最优线程数。
+    对于 I/O 密集型任务，线程数通常设置为 CPU 核心数的 2-4 倍。
+    """
+    from ut_agent.config import settings
+    if settings.max_concurrent_threads > 0:
+        return settings.max_concurrent_threads
+    cpu_count = multiprocessing.cpu_count()
+    optimal = min(cpu_count * 2, 8)
+    return max(optimal, 2)
+
+
+MAX_CONCURRENT_GENERATIONS = get_optimal_thread_count()
+logger = get_logger("nodes")
 
 
 async def detect_project_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -34,7 +52,6 @@ async def detect_project_node(state: AgentState, config: RunnableConfig) -> Dict
     project_type, build_tool = detect_project_type(project_path)
 
     if incremental:
-        # 增量模式：只获取变更的文件
         try:
             git_analyzer = GitAnalyzer(project_path)
             base_ref = state.get("base_ref")
@@ -52,7 +69,7 @@ async def detect_project_node(state: AgentState, config: RunnableConfig) -> Dict
                 "message": f"增量模式：检测到 {len(source_files)} 个变更的源文件",
             }
         except Exception as e:
-            # 如果Git分析失败，回退到全量分析
+            logger.warning(f"Git分析失败，回退到全量分析: {e}")
             source_files = find_source_files(project_path, project_type)
             return {
                 "project_type": project_type,
@@ -63,7 +80,6 @@ async def detect_project_node(state: AgentState, config: RunnableConfig) -> Dict
                 "message": f"Git分析失败({e})，回退到全量分析，找到 {len(source_files)} 个源文件",
             }
     else:
-        # 全量模式
         source_files = find_source_files(project_path, project_type)
         return {
             "project_type": project_type,
@@ -102,6 +118,7 @@ async def detect_changes_node(state: AgentState, config: RunnableConfig) -> Dict
             "message": f"变更分析完成：新增 {total_added} 个方法，修改 {total_modified} 个方法，删除 {total_deleted} 个方法",
         }
     except Exception as e:
+        logger.error(f"变更分析失败: {e}")
         return {
             "change_summaries": [],
             "status": "changes_error",
@@ -110,23 +127,33 @@ async def detect_changes_node(state: AgentState, config: RunnableConfig) -> Dict
 
 
 async def analyze_code_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
-    """分析源代码."""
+    """分析源代码（支持并行分析）."""
     project_type = state["project_type"]
     target_files = state["target_files"]
     analyzed_files = []
 
-    for file_path in target_files:
+    max_workers = config.get("configurable", {}).get("max_workers", MAX_CONCURRENT_GENERATIONS)
+
+    def analyze_single_file(file_path: str) -> Optional[Dict[str, Any]]:
         try:
             if project_type == "java":
-                analysis = analyze_java_file(file_path)
+                return analyze_java_file(file_path)
             elif project_type in ["vue", "react", "typescript"]:
-                analysis = analyze_ts_file(file_path)
-            else:
-                continue
-
-            analyzed_files.append(analysis)
+                return analyze_ts_file(file_path)
+            return None
         except Exception as e:
-            print(f"分析文件失败 {file_path}: {e}")
+            logger.error(f"分析文件失败 {file_path}: {e}")
+            return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(executor, analyze_single_file, file_path)
+            for file_path in target_files
+        ]
+        results = await asyncio.gather(*futures)
+
+    analyzed_files = [r for r in results if r is not None]
 
     return {
         "analyzed_files": analyzed_files,
@@ -136,26 +163,35 @@ async def analyze_code_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
 
 async def generate_tests_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
-    """生成单元测试."""
+    """生成单元测试（支持并行生成）."""
     project_type = state["project_type"]
     analyzed_files = state["analyzed_files"]
     llm_provider = config.get("configurable", {}).get("llm_provider", "openai")
+    max_workers = config.get("configurable", {}).get("max_workers", MAX_CONCURRENT_GENERATIONS)
 
     llm = get_llm(llm_provider)
     generated_tests = []
 
-    for file_analysis in analyzed_files:
+    def generate_single_test(file_analysis: Dict[str, Any]) -> Optional[GeneratedTestFile]:
         try:
             if project_type == "java":
-                test_file = generate_java_test(file_analysis, llm)
+                return generate_java_test(file_analysis, llm)
             elif project_type in ["vue", "react", "typescript"]:
-                test_file = generate_frontend_test(file_analysis, project_type, llm)
-            else:
-                continue
-
-            generated_tests.append(test_file)
+                return generate_frontend_test(file_analysis, project_type, llm)
+            return None
         except Exception as e:
-            print(f"生成测试失败: {e}")
+            logger.error(f"生成测试失败: {e}")
+            return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(executor, generate_single_test, file_analysis)
+            for file_analysis in analyzed_files
+        ]
+        results = await asyncio.gather(*futures)
+
+    generated_tests = [r for r in results if r is not None]
 
     return {
         "generated_tests": generated_tests,
@@ -175,10 +211,8 @@ async def save_tests_node(state: AgentState, config: RunnableConfig) -> Dict[str
     saved_count = 0
     warnings = []
 
-    # 创建测试文件映射器
     test_mapper = TestFileMapper(project_path, project_type)
 
-    # 构建变更摘要字典
     change_dict = {s.file_path: s for s in change_summaries}
 
     for test_file in generated_tests:
@@ -188,21 +222,18 @@ async def save_tests_node(state: AgentState, config: RunnableConfig) -> Dict[str
 
             final_test_code = test_file.test_code
 
-            # 增量模式：智能合并测试
             if incremental:
                 source_file = test_file.source_file
                 if source_file in change_dict:
                     change_summary = change_dict[source_file]
 
-                    # 读取源文件内容
                     source_content = ""
                     try:
                         with open(source_file, "r", encoding="utf-8") as f:
                             source_content = f.read()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"读取源文件失败 {source_file}: {e}")
 
-                    # 合并测试
                     final_test_code, merge_warnings = test_mapper.update_mapping(
                         source_file=source_file,
                         new_source_content=source_content,
@@ -218,6 +249,7 @@ async def save_tests_node(state: AgentState, config: RunnableConfig) -> Dict[str
 
             saved_count += 1
         except Exception as e:
+            logger.error(f"保存测试文件失败 {test_file.test_file_path}: {e}")
             warnings.append(f"保存测试文件失败 {test_file.test_file_path}: {e}")
 
     message = f"成功保存 {saved_count} 个测试文件"
@@ -249,6 +281,7 @@ async def execute_tests_node(state: AgentState, config: RunnableConfig) -> Dict[
             "message": output,
         }
     except Exception as e:
+        logger.error(f"执行测试出错: {e}")
         return {
             "status": "execution_error",
             "message": f"执行测试出错: {e}",
@@ -288,6 +321,7 @@ async def analyze_coverage_node(state: AgentState, config: RunnableConfig) -> Di
                 "message": "未找到覆盖率报告",
             }
     except Exception as e:
+        logger.error(f"分析覆盖率出错: {e}")
         return {
             "status": "coverage_error",
             "message": f"分析覆盖率出错: {e}",
@@ -356,6 +390,7 @@ async def plan_improvement_node(state: AgentState, config: RunnableConfig) -> Di
             "message": "已制定改进计划",
         }
     except Exception as e:
+        logger.error(f"制定改进计划出错: {e}")
         return {
             "improvement_plan": "",
             "iteration_count": state["iteration_count"] + 1,
@@ -394,7 +429,7 @@ async def generate_additional_tests_node(
 
                 additional_tests.append(test_file)
         except Exception as e:
-            print(f"生成补充测试失败: {e}")
+            logger.error(f"生成补充测试失败: {e}")
 
     return {
         "generated_tests": additional_tests,
@@ -407,6 +442,8 @@ async def generate_html_report_node(
     state: AgentState, config: RunnableConfig
 ) -> Dict[str, Any]:
     """生成HTML报告."""
+    from pathlib import Path
+    
     project_path = state["project_path"]
     coverage_report = state.get("coverage_report")
 
@@ -429,6 +466,7 @@ async def generate_html_report_node(
             "message": f"HTML报告已生成: {report_path}",
         }
     except Exception as e:
+        logger.error(f"HTML报告生成失败: {e}")
         return {
             "html_report_path": None,
             "status": state["status"],

@@ -161,17 +161,21 @@ class CIReporter:
         return "\n".join(lines)
     
     def _write_github_output(self, result: CIResult) -> None:
-        github_output_file = Path(os.environ.get("GITHUB_OUTPUT", ""))
-        if github_output_file.exists():
-            with open(github_output_file, "a", encoding="utf-8") as f:
-                f.write(f"coverage={result.coverage}\n")
-                f.write(f"success={str(result.success).lower()}\n")
-                f.write(f"generated_tests={len(result.generated_tests)}\n")
+        github_output_path = os.environ.get("GITHUB_OUTPUT", "")
+        if github_output_path:
+            github_output_file = Path(github_output_path)
+            if github_output_file.exists():
+                with open(github_output_file, "a", encoding="utf-8") as f:
+                    f.write(f"coverage={result.coverage}\n")
+                    f.write(f"success={str(result.success).lower()}\n")
+                    f.write(f"generated_tests={len(result.generated_tests)}\n")
         
-        github_step_summary = Path(os.environ.get("GITHUB_STEP_SUMMARY", ""))
-        if github_step_summary.exists():
-            with open(github_step_summary, "a", encoding="utf-8") as f:
-                f.write(result.to_github_summary())
+        github_summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "")
+        if github_summary_path:
+            github_step_summary = Path(github_summary_path)
+            if github_step_summary.exists():
+                with open(github_step_summary, "a", encoding="utf-8") as f:
+                    f.write(result.to_github_summary())
     
     def _get_exit_code(self, result: CIResult) -> int:
         if not result.success:

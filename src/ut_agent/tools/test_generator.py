@@ -4,7 +4,11 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
-from ut_agent.graph.state import TestFile, CoverageGap
+from ut_agent.graph.state import GeneratedTestFile, CoverageGap
+from ut_agent.tools.test_data_generator import (
+    BoundaryValueGenerator,
+    format_test_data_for_prompt,
+)
 
 
 def generate_java_test(
@@ -12,7 +16,8 @@ def generate_java_test(
     llm: BaseChatModel,
     gap_info: Optional[CoverageGap] = None,
     plan: Optional[str] = None,
-) -> TestFile:
+    use_boundary_values: bool = True,
+) -> GeneratedTestFile:
     """生成 Java JUnit 5 测试.
 
     Args:
@@ -20,20 +25,19 @@ def generate_java_test(
         llm: LLM 模型
         gap_info: 覆盖率缺口信息 (用于补充测试)
         plan: 改进计划
+        use_boundary_values: 是否使用边界值生成器
 
     Returns:
-        TestFile: 生成的测试文件
+        GeneratedTestFile: 生成的测试文件
     """
     class_name = file_analysis["class_name"]
     package = file_analysis["package"]
     methods = file_analysis.get("methods", [])
     fields = file_analysis.get("fields", [])
 
-    # 构建测试类路径
     file_path = file_analysis["file_path"]
     path = Path(file_path)
 
-    # 推断测试目录
     project_path = path.parent
     while project_path.name not in ["java", "src"] and project_path.parent != project_path:
         project_path = project_path.parent
@@ -46,9 +50,21 @@ def generate_java_test(
     relative_path = path.relative_to(project_path) if path.is_relative_to(project_path) else path
     test_file_path = test_dir / relative_path.parent / f"{class_name}Test.java"
 
-    # 构建 Prompt
+    boundary_data_section = ""
+    if use_boundary_values:
+        data_generator = BoundaryValueGenerator(language="java")
+        boundary_data_sections = []
+        for method in methods:
+            if method.get("is_public", True):
+                test_data = data_generator.generate_test_data_for_method(method)
+                if test_data:
+                    formatted = format_test_data_for_prompt(test_data, language="java")
+                    boundary_data_sections.append(f"\n方法 {method['name']}:\n{formatted}")
+
+        if boundary_data_sections:
+            boundary_data_section = "\n\n边界值测试数据建议:\n" + "\n".join(boundary_data_sections[:5])
+
     if gap_info and plan:
-        # 补充测试模式
         prompt = f"""作为 Java 单元测试专家，请为以下类生成补充测试用例，针对特定的覆盖率缺口。
 
 目标类: {class_name}
@@ -65,6 +81,7 @@ def generate_java_test(
 
 已有方法:
 {format_java_methods(methods)}
+{boundary_data_section}
 
 请生成 JUnit 5 测试代码，只包含针对该缺口的测试方法。
 要求:
@@ -73,9 +90,9 @@ def generate_java_test(
 3. 包含 Arrange-Act-Assert 结构
 4. 添加清晰的注释说明测试目的
 5. 只返回测试方法代码，不要包含类声明和导入
+6. 优先使用上述边界值建议中的测试数据
 """
     else:
-        # 完整测试模式
         prompt = f"""作为 Java 单元测试专家，请为以下类生成完整的 JUnit 5 测试类。
 
 目标类: {class_name}
@@ -86,32 +103,29 @@ def generate_java_test(
 
 类方法:
 {format_java_methods(methods)}
+{boundary_data_section}
 
 请生成完整的 JUnit 5 测试类代码。
 要求:
 1. 使用 JUnit 5 (org.junit.jupiter.api.Test, org.junit.jupiter.api.BeforeEach 等)
 2. 使用 Mockito (org.mockito.Mockito, org.mockito.InjectMocks, org.mockito.Mock)
 3. 为每个公共方法生成至少 2 个测试用例 (正常场景 + 异常场景)
-4. 包含边界条件测试
+4. 包含边界条件测试，优先使用上述边界值建议
 5. 使用 given-when-then 命名风格
 6. 添加 @DisplayName 注解说明测试目的
 7. 包含必要的导入语句
 8. 测试类命名为 {class_name}Test
 """
 
-    # 调用 LLM
     response = llm.invoke(prompt)
     test_code = str(response.content)
 
-    # 清理代码块标记
     test_code = clean_code_blocks(test_code)
 
-    # 确保是完整类
     if gap_info and plan:
-        # 补充测试需要包装成完整类
         test_code = wrap_additional_test(test_code, class_name, package, file_analysis)
 
-    return TestFile(
+    return GeneratedTestFile(
         source_file=file_path,
         test_file_path=str(test_file_path),
         test_code=test_code,
@@ -125,7 +139,8 @@ def generate_frontend_test(
     llm: BaseChatModel,
     gap_info: Optional[CoverageGap] = None,
     plan: Optional[str] = None,
-) -> TestFile:
+    use_boundary_values: bool = True,
+) -> GeneratedTestFile:
     """生成前端测试 (Jest/Vitest).
 
     Args:
@@ -134,6 +149,7 @@ def generate_frontend_test(
         llm: LLM 模型
         gap_info: 覆盖率缺口信息
         plan: 改进计划
+        use_boundary_values: 是否使用边界值生成器
 
     Returns:
         TestFile: 生成的测试文件
@@ -145,10 +161,22 @@ def generate_frontend_test(
     is_vue = file_analysis.get("is_vue", False)
     component_info = file_analysis.get("component_info", {})
 
-    # 测试文件路径
     test_file_path = path.parent / f"{file_name}.spec.ts"
 
-    # 构建 Prompt
+    boundary_data_section = ""
+    if use_boundary_values:
+        data_generator = BoundaryValueGenerator(language="typescript")
+        boundary_data_sections = []
+        for func in functions:
+            if func.get("is_exported", False) or func.get("type") == "function":
+                test_data = data_generator.generate_test_data_for_method(func)
+                if test_data:
+                    formatted = format_test_data_for_prompt(test_data, language="typescript")
+                    boundary_data_sections.append(f"\n函数 {func['name']}:\n{formatted}")
+
+        if boundary_data_sections:
+            boundary_data_section = "\n\n边界值测试数据建议:\n" + "\n".join(boundary_data_sections[:5])
+
     if gap_info and plan:
         prompt = f"""作为前端单元测试专家，请为以下代码生成补充测试用例。
 
@@ -163,12 +191,14 @@ def generate_frontend_test(
 
 改进计划:
 {plan}
+{boundary_data_section}
 
 请生成针对该缺口的测试代码，只返回测试代码块。
 要求:
 1. 使用 Vitest (describe, it, expect, vi)
 2. 包含 Arrange-Act-Assert 结构
 3. 添加清晰的注释
+4. 优先使用上述边界值建议中的测试数据
 """
     else:
         if is_vue:
@@ -181,6 +211,7 @@ def generate_frontend_test(
 
 导出函数:
 {format_ts_functions(functions)}
+{boundary_data_section}
 
 请生成完整的 Vitest + Vue Test Utils 测试代码。
 要求:
@@ -191,6 +222,7 @@ def generate_frontend_test(
 5. 包含正常场景和异常场景
 6. 添加清晰的 describe 和 it 描述
 7. 测试文件命名为 {file_name}.spec.ts
+8. 优先使用上述边界值建议中的测试数据
 """
         else:
             prompt = f"""作为 TypeScript 单元测试专家，请为以下代码生成完整的测试文件。
@@ -200,6 +232,7 @@ def generate_frontend_test(
 
 导出函数:
 {format_ts_functions(functions)}
+{boundary_data_section}
 
 请生成完整的 Vitest 测试代码。
 要求:
@@ -209,16 +242,15 @@ def generate_frontend_test(
 4. 使用 vi.fn() 模拟依赖
 5. 添加清晰的 describe 和 it 描述
 6. 测试文件命名为 {file_name}.spec.ts
+7. 优先使用上述边界值建议中的测试数据
 """
 
-    # 调用 LLM
     response = llm.invoke(prompt)
     test_code = str(response.content)
 
-    # 清理代码块标记
     test_code = clean_code_blocks(test_code)
 
-    return TestFile(
+    return GeneratedTestFile(
         source_file=file_path,
         test_file_path=str(test_file_path),
         test_code=test_code,
@@ -233,8 +265,9 @@ def format_java_methods(methods: list) -> str:
 
     result = []
     for m in methods:
-        params = ", ".join([f"{p['type']} {p['name']}" for p in m.get("parameters", [])])
-        result.append(f"- {m['signature']} (返回: {m['return_type']})")
+        signature = m.get("signature", "void method()")
+        return_type = m.get("return_type", "void")
+        result.append(f"- {signature} (返回: {return_type})")
     return "\n".join(result)
 
 
@@ -256,11 +289,13 @@ def format_ts_functions(functions: list) -> str:
 
     result = []
     for f in functions:
-        params = ", ".join([f"{p['name']}: {p['type']}" for p in f.get("parameters", [])])
+        params = ", ".join([f"{p.get('name', 'param')}: {p.get('type', 'any')}" for p in f.get("parameters", [])])
         export_mark = "export " if f.get("is_exported") else ""
         async_mark = "async " if f.get("is_async") else ""
+        name = f.get("name", "anonymous")
+        return_type = f.get("return_type", "void")
         result.append(
-            f"- {export_mark}{async_mark}{f['name']}({params}): {f['return_type']}"
+            f"- {export_mark}{async_mark}{name}({params}): {return_type}"
         )
     return "\n".join(result)
 

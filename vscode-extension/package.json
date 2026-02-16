@@ -1,0 +1,253 @@
+{
+  "name": "ut-agent-vscode",
+  "displayName": "UT-Agent: AI Unit Test Generator",
+  "description": "AI驱动的单元测试生成插件 - 支持Java/Vue/React/TypeScript",
+  "version": "0.1.0",
+  "publisher": "ut-agent",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Machine Learning",
+    "Snippets"
+  ],
+  "keywords": [
+    "unit test",
+    "test generation",
+    "AI",
+    "Java",
+    "Vue",
+    "React",
+    "TypeScript",
+    "JUnit",
+    "Jest",
+    "Vitest"
+  ],
+  "activationEvents": [
+    "onLanguage:java",
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onLanguage:vue",
+    "onCommand:ut-agent.generateTest"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ut-agent.generateTest",
+        "title": "Generate Unit Test",
+        "category": "UT-Agent",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "ut-agent.generateTestForSelection",
+        "title": "Generate Test for Selection",
+        "category": "UT-Agent"
+      },
+      {
+        "command": "ut-agent.openSettings",
+        "title": "Open Settings",
+        "category": "UT-Agent",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "ut-agent.showCoverage",
+        "title": "Show Coverage Report",
+        "category": "UT-Agent",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "ut-agent.refreshSidebar",
+        "title": "Refresh",
+        "category": "UT-Agent",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceExtname =~ /\\.(java|ts|js|vue)$/",
+          "command": "ut-agent.generateTest",
+          "group": "ut-agent@1"
+        },
+        {
+          "when": "editorHasSelection && resourceExtname =~ /\\.(java|ts|js|vue)$/",
+          "command": "ut-agent.generateTestForSelection",
+          "group": "ut-agent@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceExtname =~ /\\.(java|ts|js|vue)$/",
+          "command": "ut-agent.generateTest",
+          "group": "ut-agent@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ut-agent.generateTest",
+          "when": "editorLangId =~ /(java|typescript|javascript|vue)/"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "ut-agent.sidebar",
+          "name": "UT-Agent",
+          "when": "workspaceHasJava || workspaceHasTypeScript"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ut-agent-container",
+          "title": "UT-Agent",
+          "icon": "$(beaker)"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "UT-Agent",
+      "properties": {
+        "ut-agent.llm.provider": {
+          "type": "string",
+          "default": "openai",
+          "enum": [
+            "openai",
+            "deepseek",
+            "ollama"
+          ],
+          "enumDescriptions": [
+            "OpenAI GPT-4",
+            "DeepSeek",
+            "本地 Ollama 模型"
+          ],
+          "description": "选择 LLM 提供商"
+        },
+        "ut-agent.llm.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key (如使用 OpenAI/DeepSeek)"
+        },
+        "ut-agent.llm.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "自定义 API Base URL (可选)"
+        },
+        "ut-agent.llm.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "description": "模型名称"
+        },
+        "ut-agent.coverage.target": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "覆盖率目标 (%)"
+        },
+        "ut-agent.generation.maxIterations": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "最大迭代次数"
+        },
+        "ut-agent.generation.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "自动生成后保存测试文件"
+        },
+        "ut-agent.generation.openAfterGenerate": {
+          "type": "boolean",
+          "default": true,
+          "description": "生成后打开测试文件"
+        },
+        "ut-agent.java.testFramework": {
+          "type": "string",
+          "default": "junit5",
+          "enum": [
+            "junit5",
+            "junit4",
+            "testng"
+          ],
+          "description": "Java 测试框架"
+        },
+        "ut-agent.java.mockFramework": {
+          "type": "string",
+          "default": "mockito",
+          "enum": [
+            "mockito",
+            "powermock",
+            "easymock"
+          ],
+          "description": "Java Mock 框架"
+        },
+        "ut-agent.frontend.testFramework": {
+          "type": "string",
+          "default": "vitest",
+          "enum": [
+            "vitest",
+            "jest"
+          ],
+          "description": "前端测试框架"
+        },
+        "ut-agent.advanced.verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用详细日志输出"
+        },
+        "ut-agent.advanced.timeout": {
+          "type": "number",
+          "default": 120,
+          "minimum": 30,
+          "maximum": 600,
+          "description": "生成超时时间 (秒)"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "ut-agent.generateTest",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus && editorLangId =~ /(java|typescript|javascript|vue)/"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ut-agent"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/ut-agent/issues"
+  },
+  "homepage": "https://github.com/your-org/ut-agent#readme",
+  "license": "MIT"
+}

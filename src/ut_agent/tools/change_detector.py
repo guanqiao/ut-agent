@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from ut_agent.tools.git_analyzer import ChangeType, CodeChange, GitAnalyzer
 
@@ -589,7 +589,9 @@ class TypeScriptChangeDetector:
         )
 
 
-def create_change_detector(project_path: str, project_type: str):
+def create_change_detector(
+    project_path: str, project_type: str
+) -> Union["JavaChangeDetector", "TypeScriptChangeDetector"]:
     """创建变更检测器工厂函数.
 
     Args:

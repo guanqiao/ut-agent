@@ -1,9 +1,11 @@
 """覆盖率分析模块."""
 
 import xml.etree.ElementTree as ET
+import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from ut_agent.graph.state import CoverageReport, CoverageGap
+from ut_agent.exceptions import CoverageAnalysisError
 
 
 def parse_jacoco_report(project_path: str) -> Optional[CoverageReport]:
@@ -96,9 +98,18 @@ def parse_jacoco_report(project_path: str) -> Optional[CoverageReport]:
             },
         )
 
+    except ET.ParseError as e:
+        raise CoverageAnalysisError(
+            f"Failed to parse JaCoCo XML report: {e}",
+            report_path=str(report_path),
+            report_format="jacoco"
+        )
     except Exception as e:
-        print(f"解析 JaCoCo 报告出错: {e}")
-        return None
+        raise CoverageAnalysisError(
+            f"Unexpected error parsing JaCoCo report: {e}",
+            report_path=str(report_path),
+            report_format="jacoco"
+        )
 
 
 def parse_istanbul_report(project_path: str) -> Optional[CoverageReport]:

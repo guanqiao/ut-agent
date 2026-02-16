@@ -2,7 +2,6 @@
 
 from ut_agent.tools.project_detector import detect_project_type, find_source_files
 from ut_agent.tools.code_analyzer import analyze_java_file, analyze_ts_file
-from ut_agent.tools.test_generator import generate_java_test, generate_frontend_test
 from ut_agent.tools.test_executor import execute_java_tests, execute_frontend_tests
 from ut_agent.tools.coverage_analyzer import (
     parse_jacoco_report,
@@ -15,8 +14,6 @@ __all__ = [
     "find_source_files",
     "analyze_java_file",
     "analyze_ts_file",
-    "generate_java_test",
-    "generate_frontend_test",
     "execute_java_tests",
     "execute_frontend_tests",
     "parse_jacoco_report",

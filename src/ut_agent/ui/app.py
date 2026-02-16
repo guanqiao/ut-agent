@@ -58,7 +58,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def init_session_state():
+def init_session_state() -> None:
     """初始化会话状态."""
     if "workflow_started" not in st.session_state:
         st.session_state.workflow_started = False
@@ -68,7 +68,7 @@ def init_session_state():
         st.session_state.logs = []
 
 
-def render_header():
+def render_header() -> None:
     """渲染页面头部."""
     st.markdown('<p class="main-header">🧪 UT-Agent</p>', unsafe_allow_html=True)
     st.markdown(
@@ -78,7 +78,7 @@ def render_header():
     st.markdown("---")
 
 
-def render_sidebar():
+def render_sidebar() -> dict:
     """渲染侧边栏."""
     with st.sidebar:
         st.header("⚙️ 配置")
@@ -127,7 +127,7 @@ def render_sidebar():
         }
 
 
-def render_main_content(config: dict):
+def render_main_content(config: dict) -> None:
     """渲染主内容区."""
     st.header("📁 项目配置")
 
@@ -197,7 +197,7 @@ def render_main_content(config: dict):
         render_results(st.session_state.workflow_result)
 
 
-def run_workflow(project_path: str, project_type: str, config: dict):
+def run_workflow(project_path: str, project_type: str, config: dict) -> None:
     """运行工作流."""
     try:
         # 创建初始状态
@@ -236,7 +236,7 @@ def run_workflow(project_path: str, project_type: str, config: dict):
         st.session_state.workflow_started = False
 
 
-async def run_graph(graph, initial_state: AgentState, config: dict):
+async def run_graph(graph, initial_state: AgentState, config: dict) -> dict:
     """异步运行图."""
     result = None
     async for event in graph.astream(
@@ -254,7 +254,7 @@ async def run_graph(graph, initial_state: AgentState, config: dict):
     return result
 
 
-def render_results(result: dict):
+def render_results(result: dict) -> None:
     """渲染结果."""
     st.markdown("---")
     st.header("📈 执行结果")
@@ -312,7 +312,7 @@ def render_results(result: dict):
                 st.code(test_file.test_code, language=test_file.language)
 
 
-def main():
+def main() -> None:
     """主函数."""
     init_session_state()
     render_header()

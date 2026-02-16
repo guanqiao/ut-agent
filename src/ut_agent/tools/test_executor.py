@@ -5,6 +5,12 @@ import os
 from pathlib import Path
 from typing import Tuple, Optional
 
+from ut_agent.exceptions import (
+    TestExecutionError,
+    TimeoutError,
+    ProjectDetectionError,
+)
+
 
 def execute_java_tests(project_path: str, build_tool: str = "maven") -> Tuple[bool, str]:
     """执行 Java 测试.
@@ -40,11 +46,23 @@ def execute_java_tests(project_path: str, build_tool: str = "maven") -> Tuple[bo
             return False, result.stderr or result.stdout or "测试执行失败"
 
     except subprocess.TimeoutExpired:
-        return False, "测试执行超时"
+        raise TimeoutError(
+            f"Java test execution timed out after 300 seconds",
+            timeout_seconds=300
+        )
     except FileNotFoundError:
-        return False, f"未找到 {build_tool} 命令，请确保已安装并添加到 PATH"
+        raise ProjectDetectionError(
+            f"{build_tool} command not found, please ensure it is installed and added to PATH",
+            project_path=project_path
+        )
+    except TestExecutionError:
+        raise
     except Exception as e:
-        return False, f"执行出错: {e}"
+        raise TestExecutionError(
+            f"Unexpected error executing Java tests: {e}",
+            source_file=None,
+            test_file=None,
+        )
 
 
 def execute_frontend_tests(project_path: str) -> Tuple[bool, str]:

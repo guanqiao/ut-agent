@@ -74,7 +74,7 @@ class ShortTermMemoryManager:
         session_id: str,
         role: str,
         content: str,
-        metadata: Dict[str, Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         context = self.get_session(session_id)
         if context:

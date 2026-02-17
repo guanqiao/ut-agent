@@ -1,7 +1,7 @@
 """HTML报告模板."""
 
-from dataclasses import dataclass
-from typing import List, Dict, Any
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional
 
 
 @dataclass
@@ -13,14 +13,8 @@ class FileCoverage:
     branch_coverage: float
     total_lines: int
     covered_lines: int
-    uncovered_lines: List[int] = None
-    partially_covered_lines: List[int] = None
-
-    def __post_init__(self):
-        if self.uncovered_lines is None:
-            self.uncovered_lines = []
-        if self.partially_covered_lines is None:
-            self.partially_covered_lines = []
+    uncovered_lines: List[int] = field(default_factory=list)
+    partially_covered_lines: List[int] = field(default_factory=list)
 
 
 @dataclass
@@ -38,17 +32,9 @@ class ReportData:
     covered_lines: int
     total_branches: int
     covered_branches: int
-    files: List[FileCoverage] = None
-    gaps: List[Any] = None
-    history: List[Dict[str, Any]] = None
-
-    def __post_init__(self):
-        if self.files is None:
-            self.files = []
-        if self.gaps is None:
-            self.gaps = []
-        if self.history is None:
-            self.history = []
+    files: List[FileCoverage] = field(default_factory=list)
+    gaps: List[Any] = field(default_factory=list)
+    history: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class HTMLTemplates:

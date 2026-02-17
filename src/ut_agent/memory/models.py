@@ -161,7 +161,7 @@ class SessionContext:
     def touch(self) -> None:
         self.last_accessed = datetime.now()
     
-    def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None) -> None:
+    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         self.conversation_history.append({
             "role": role,
             "content": content,

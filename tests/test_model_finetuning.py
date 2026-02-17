@@ -8,9 +8,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from typing import Dict, Any, List, Optional
 
-# 设置虚拟 API key 以避免导入错误
-os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
-
 from ut_agent.ai.model_finetuning import (
     FinetuningJob,
     FinetuningStatus,
@@ -141,6 +138,11 @@ class TestDatasetValidator:
 
 class TestOpenAIFinetuningProvider:
     """OpenAI 微调提供者测试."""
+
+    @pytest.fixture(autouse=True)
+    def setup_openai_env(self, monkeypatch):
+        """设置 OpenAI 环境变量."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
 
     @pytest.fixture
     def provider(self):

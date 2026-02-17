@@ -1,5 +1,11 @@
 """CI/CD 集成模块."""
 
+from ut_agent.ci.base import (
+    ExitCode,
+    CIResult,
+    TestGenerationReport,
+    CIReporter,
+)
 from ut_agent.ci.github_actions import (
     GitHubActionsWorkflow,
     WorkflowTrigger,
@@ -19,6 +25,10 @@ from ut_agent.ci.gitlab_ci import (
 )
 
 __all__ = [
+    "ExitCode",
+    "CIResult",
+    "TestGenerationReport",
+    "CIReporter",
     "GitHubActionsWorkflow",
     "WorkflowTrigger",
     "WorkflowJob",

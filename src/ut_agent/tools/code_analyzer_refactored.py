@@ -29,6 +29,20 @@ class MethodInfo:
     is_public: bool = True
     is_static: bool = False
 
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典."""
+        return {
+            "name": self.name,
+            "signature": self.signature,
+            "return_type": self.return_type,
+            "parameters": self.parameters,
+            "annotations": self.annotations,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "is_public": self.is_public,
+            "is_static": self.is_static,
+        }
+
 
 @dataclass
 class ClassInfo:
@@ -41,6 +55,39 @@ class ClassInfo:
     fields: List[Dict[str, Any]]
     superclass: Optional[str] = None
     interfaces: List[str] = field(default_factory=list)
+
+
+@dataclass
+class AnalysisResult:
+    """分析结果."""
+    file_path: str
+    file_name: str
+    language: str
+    package: str = ""
+    class_name: str = ""
+    imports: List[str] = field(default_factory=list)
+    annotations: List[str] = field(default_factory=list)
+    methods: List[MethodInfo] = field(default_factory=list)
+    fields: List[Dict[str, Any]] = field(default_factory=list)
+    functions: List[Dict[str, Any]] = field(default_factory=list)
+    content: str = ""
+    line_count: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典."""
+        return {
+            "file_path": self.file_path,
+            "file_name": self.file_name,
+            "language": self.language,
+            "package": self.package,
+            "class_name": self.class_name,
+            "imports": self.imports,
+            "annotations": self.annotations,
+            "methods": [m.to_dict() if hasattr(m, 'to_dict') else m for m in self.methods],
+            "fields": self.fields,
+            "functions": self.functions,
+            "line_count": self.line_count,
+        }
 
 
 class FileReader:
@@ -518,3 +565,190 @@ from ut_agent.tools.code_analyzer import (
     find_testable_methods,
     parse_ts_params,
 )
+
+
+class JavaAnalyzer:
+    """Java 代码分析器 - 面向对象接口."""
+
+    def analyze(self, content: str, file_path: str, use_cache: bool = True) -> AnalysisResult:
+        """分析 Java 代码.
+
+        Args:
+            content: 文件内容
+            file_path: 文件路径
+            use_cache: 是否使用缓存
+
+        Returns:
+            AnalysisResult: 分析结果
+        """
+        lines = content.split("\n")
+        path = Path(file_path)
+
+        ast_data = JavaASTParser.parse(file_path, use_cache) if use_cache else None
+        package, imports, class_name, annotations, methods, fields = JavaInfoExtractor.extract(
+            ast_data, content, file_path
+        )
+
+        return AnalysisResult(
+            file_path=file_path,
+            file_name=path.name,
+            language="java",
+            package=package,
+            class_name=class_name,
+            imports=imports,
+            annotations=annotations,
+            methods=methods,
+            fields=fields,
+            content=content,
+            line_count=len(lines),
+        )
+
+    def extract_package(self, content: str) -> str:
+        """提取包名."""
+        return JavaInfoExtractor._extract_package_regex(content)
+
+    def extract_imports(self, content: str) -> List[str]:
+        """提取导入."""
+        return JavaInfoExtractor._extract_imports_regex(content)
+
+    def extract_class_name(self, content: str) -> str:
+        """提取类名."""
+        class_name, _ = JavaInfoExtractor._extract_class_info_regex(content, Path("dummy.java"))
+        return class_name
+
+    def extract_class_annotations(self, content: str) -> List[str]:
+        """提取类注解."""
+        _, annotations = JavaInfoExtractor._extract_class_info_regex(content, Path("dummy.java"))
+        return annotations
+
+    def extract_methods(self, content: str) -> List[MethodInfo]:
+        """提取方法."""
+        return JavaInfoExtractor._extract_methods_regex(content)
+
+    def extract_fields(self, content: str) -> List[Dict[str, Any]]:
+        """提取字段."""
+        return JavaInfoExtractor._extract_fields_regex(content)
+
+
+class TypeScriptAnalyzer:
+    """TypeScript 代码分析器 - 面向对象接口."""
+
+    def analyze(self, content: str, file_path: str) -> AnalysisResult:
+        """分析 TypeScript 代码.
+
+        Args:
+            content: 文件内容
+            file_path: 文件路径
+
+        Returns:
+            AnalysisResult: 分析结果
+        """
+        lines = content.split("\n")
+        path = Path(file_path)
+
+        imports = self.extract_imports(content)
+        functions = self.extract_functions(content)
+
+        return AnalysisResult(
+            file_path=file_path,
+            file_name=path.name,
+            language="typescript",
+            imports=imports,
+            functions=functions,
+            content=content,
+            line_count=len(lines),
+        )
+
+    def extract_imports(self, content: str) -> List[Dict[str, str]]:
+        """提取导入."""
+        imports = []
+
+        named_pattern = r"import\s+{([^}]+)}\s+from\s+['\"]([^'\"]+)['\"]"
+        for match in re.finditer(named_pattern, content):
+            names = match.group(1)
+            source = match.group(2)
+            for name in names.split(","):
+                imports.append({
+                    "name": name.strip(),
+                    "source": source,
+                    "type": "named"
+                })
+
+        default_pattern = r"import\s+(\w+)\s+from\s+['\"]([^'\"]+)['\"]"
+        for match in re.finditer(default_pattern, content):
+            imports.append({
+                "name": match.group(1),
+                "source": match.group(2),
+                "type": "default"
+            })
+
+        return imports
+
+    def extract_functions(self, content: str) -> List[Dict[str, Any]]:
+        """提取函数."""
+        functions = []
+
+        func_pattern = r"(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)(?:\s*:\s*(\w+))?"
+        for match in re.finditer(func_pattern, content):
+            func_name = match.group(1)
+            params = match.group(2)
+            return_type = match.group(3) or "void"
+
+            start_pos = match.start()
+            line_num = content[:start_pos].count("\n") + 1
+
+            functions.append({
+                "name": func_name,
+                "type": "function",
+                "parameters": self._parse_params(params),
+                "return_type": return_type,
+                "is_async": "async" in match.group(0),
+                "is_exported": "export" in match.group(0),
+                "line": line_num,
+            })
+
+        arrow_pattern = r"(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)(?:\s*:\s*[^=]+)?\s*=>"
+        for match in re.finditer(arrow_pattern, content):
+            func_name = match.group(1)
+            params = match.group(2)
+
+            start_pos = match.start()
+            line_num = content[:start_pos].count("\n") + 1
+
+            functions.append({
+                "name": func_name,
+                "type": "arrow_function",
+                "parameters": self._parse_params(params),
+                "return_type": "inferred",
+                "is_async": "async" in match.group(0),
+                "is_exported": "export" in match.group(0),
+                "line": line_num,
+            })
+
+        return functions
+
+    def _parse_params(self, params_str: str) -> List[Dict[str, str]]:
+        """解析参数."""
+        params = []
+        if not params_str.strip():
+            return params
+
+        for param in params_str.split(","):
+            param = param.strip()
+            if not param:
+                continue
+
+            if "=" in param:
+                param = param.split("=")[0].strip()
+
+            if ":" in param:
+                parts = param.split(":")
+                name = parts[0].strip()
+                type_str = parts[1].strip()
+                if name.startswith("{"):
+                    name = "options"
+                params.append({"name": name, "type": type_str})
+            else:
+                params.append({"name": param, "type": "any"})
+
+        return params

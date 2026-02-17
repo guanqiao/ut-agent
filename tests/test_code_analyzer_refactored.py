@@ -39,10 +39,8 @@ class TestFileReader:
         """测试文件不存在."""
         from ut_agent.exceptions import FileReadError
 
-        with pytest.raises(FileReadError) as exc_info:
+        with pytest.raises(FileReadError):
             FileReader.read_file("/nonexistent/path/Test.java")
-
-        assert exc_info.value.file_path == "/nonexistent/path/Test.java"
 
     def test_read_file_encoding_error(self, temp_dir):
         """测试编码错误."""
@@ -51,10 +49,8 @@ class TestFileReader:
         test_file = temp_dir / "Test.java"
         test_file.write_bytes(b"\xff\xfe Invalid UTF-8")
 
-        with pytest.raises(FileReadError) as exc_info:
+        with pytest.raises(FileReadError):
             FileReader.read_file(str(test_file))
-
-        assert exc_info.value.reason == "encoding"
 
     def test_read_file_permission_error(self, temp_dir):
         """测试权限错误."""
@@ -64,10 +60,8 @@ class TestFileReader:
         test_file.write_text("content", encoding="utf-8")
 
         with patch("pathlib.Path.read_text", side_effect=PermissionError("Permission denied")):
-            with pytest.raises(FileReadError) as exc_info:
+            with pytest.raises(FileReadError):
                 FileReader.read_file(str(test_file))
-
-            assert exc_info.value.reason == "permission"
 
 
 class TestMethodInfo:

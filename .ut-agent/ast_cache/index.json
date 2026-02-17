@@ -250,11 +250,31 @@
       "last_accessed": "2026-02-17T21:53:10.654557",
       "access_count": 0,
       "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpogtsub2t\\Calculator.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpogtsub2t\\Calculator.java",
+      "content_hash": "f8687c6849cf247a225888f4464806bd",
+      "language": "java",
+      "created_at": "2026-02-17T22:13:49.679837",
+      "last_accessed": "2026-02-17T22:13:49.679837",
+      "access_count": 0,
+      "size_bytes": 5718
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmprtbbjc4h\\Calculator.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmprtbbjc4h\\Calculator.java",
+      "content_hash": "f8687c6849cf247a225888f4464806bd",
+      "language": "java",
+      "created_at": "2026-02-17T22:15:01.904228",
+      "last_accessed": "2026-02-17T22:15:01.904228",
+      "access_count": 0,
+      "size_bytes": 5718
     }
   ],
   "stats": {
     "hit_count": 0,
-    "miss_count": 2,
+    "miss_count": 1,
     "eviction_count": 0
   }
 }

@@ -17,6 +17,7 @@ __all__ = [
     "OpenAIProvider",
     "DeepSeekProvider",
     "OllamaProvider",
+    "PrivateLLMProvider",
 ]
 
 
@@ -142,6 +143,40 @@ class OllamaProvider(LLMProvider):
         return True
 
 
+class PrivateLLMProvider(LLMProvider):
+    """私有 LLM 提供商（支持企业内网私有模型）.
+
+    使用 OpenAI 兼容 API，API Key 可选。
+    适用于企业内部部署的私有模型服务。
+    """
+
+    name = "private_llm"
+    requires_api_key = False
+    api_key_setting = "private_llm_api_key"
+    model_setting = "private_llm_model"
+    base_url_setting = "private_llm_base_url"
+
+    def create_model(self, config: Any) -> BaseChatModel:
+        api_key, model, base_url = self.get_config(config).values()
+        if not base_url:
+            raise ConfigurationError(
+                "私有 LLM Base URL 未配置",
+                config_key="private_llm_base_url"
+            )
+        http_client = _create_http_client(config)
+        effective_api_key = api_key if api_key else "no-key-required"
+        return ChatOpenAI(
+            model=model,
+            api_key=effective_api_key,  # type: ignore[arg-type]
+            base_url=base_url,
+            temperature=config.temperature,
+            http_client=http_client,
+        )
+
+    def is_available(self, config: Any) -> bool:
+        return bool(getattr(config, self.base_url_setting, None))
+
+
 class LLMProviderRegistry:
     """LLM 提供商注册表."""
 
@@ -247,3 +282,4 @@ def list_available_providers() -> list[str]:
 LLMProviderRegistry.register(OpenAIProvider())
 LLMProviderRegistry.register(DeepSeekProvider())
 LLMProviderRegistry.register(OllamaProvider())
+LLMProviderRegistry.register(PrivateLLMProvider())

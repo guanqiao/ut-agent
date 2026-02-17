@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5-coder:14b"
 
+    # 私有 LLM 配置（支持企业内网私有模型）
+    private_llm_base_url: Optional[str] = None
+    private_llm_api_key: Optional[str] = None
+    private_llm_model: str = "default"
+
     default_llm_provider: str = "openai"
 
     max_iterations: int = 10
@@ -70,7 +75,7 @@ class Settings(BaseSettings):
             raise ValueError("覆盖率目标必须在 0 到 100 之间")
         return v
 
-    @field_validator("openai_base_url", "deepseek_base_url", "ollama_base_url")
+    @field_validator("openai_base_url", "deepseek_base_url", "ollama_base_url", "private_llm_base_url")
     @classmethod
     def validate_url(cls, v: Optional[str]) -> Optional[str]:
         """验证 URL 格式."""

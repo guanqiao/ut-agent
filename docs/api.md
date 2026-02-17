@@ -337,6 +337,9 @@ print(f"LLM 缓存最大大小: {settings.llm_cache_max_size}")
 | `deepseek_model` | DeepSeek 模型 | "deepseek-chat" |
 | `ollama_model` | Ollama 模型 | "llama3" |
 | `ollama_base_url` | Ollama 基础 URL | "http://localhost:11434" |
+| `private_llm_base_url` | 私有 LLM 基础 URL | None |
+| `private_llm_api_key` | 私有 LLM API 密钥（可选） | None |
+| `private_llm_model` | 私有 LLM 模型名称 | "default" |
 | `ca_cert_path` | CA 证书路径（可选） | None |
 | `default_coverage_target` | 默认覆盖率目标 | 80.0 |
 | `max_iterations` | 最大迭代次数 | 5 |
@@ -456,7 +459,51 @@ CA_CERT_PATH=/path/to/your/ca-cert.pem
 2. 自建 CA 证书的私有环境
 3. 需要进行 SSL/TLS 流量审计的安全环境
 
-### 3.4 运行时配置
+### 3.4 私有 LLM 配置
+
+企业内网部署的私有大模型可以通过 `private_llm` 提供商进行配置。该提供商使用 OpenAI 兼容 API，支持无需 API Key 的场景。
+
+```env
+# 私有 LLM 配置
+DEFAULT_LLM_PROVIDER=private_llm
+PRIVATE_LLM_BASE_URL=https://internal-llm.company.com/v1
+PRIVATE_LLM_MODEL=company-model-v1
+PRIVATE_LLM_API_KEY=optional-key  # 可选，如服务需要认证则配置
+
+# 如需自定义 CA 证书
+CA_CERT_PATH=/path/to/ca-cert.pem
+```
+
+**配置说明：**
+
+| 配置项 | 必需 | 描述 |
+|--------|------|------|
+| `PRIVATE_LLM_BASE_URL` | 是 | 私有 LLM 服务的基础 URL |
+| `PRIVATE_LLM_MODEL` | 否 | 模型名称，默认为 "default" |
+| `PRIVATE_LLM_API_KEY` | 否 | API 密钥，如服务不需要认证可省略 |
+
+**使用场景：**
+
+1. 企业内部部署的私有大模型服务
+2. 使用 vLLM、TGI、LocalAI 等框架部署的 OpenAI 兼容服务
+3. 通过 API 网关代理的大模型服务
+
+**示例：**
+
+```bash
+# 使用私有 LLM 生成测试
+ut-agent generate --project ./my-project --llm private_llm
+```
+
+```python
+# Python API 使用
+from ut_agent.utils.llm import get_llm
+
+llm = get_llm(provider="private_llm")
+response = llm.invoke("Hello")
+```
+
+### 3.5 运行时配置
 
 可以在运行时修改配置：
 

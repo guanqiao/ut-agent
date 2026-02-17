@@ -241,3 +241,41 @@ class TestCACertPath:
 
         with pytest.raises(Exception):
             Settings()
+
+
+class TestPrivateLLMConfig:
+    """私有 LLM 配置测试."""
+
+    def test_private_llm_default_values(self):
+        """测试私有 LLM 默认值."""
+        s = Settings()
+        assert s.private_llm_base_url is None
+        assert s.private_llm_api_key is None
+        assert s.private_llm_model == "default"
+
+    def test_private_llm_from_env(self, monkeypatch):
+        """测试从环境变量加载私有 LLM 配置."""
+        monkeypatch.setenv("PRIVATE_LLM_BASE_URL", "https://internal-llm.company.com/v1")
+        monkeypatch.setenv("PRIVATE_LLM_MODEL", "company-model-v1")
+        monkeypatch.setenv("PRIVATE_LLM_API_KEY", "test-key")
+
+        s = Settings()
+        assert s.private_llm_base_url == "https://internal-llm.company.com/v1"
+        assert s.private_llm_model == "company-model-v1"
+        assert s.private_llm_api_key == "test-key"
+
+    def test_private_llm_without_api_key(self, monkeypatch):
+        """测试私有 LLM 无 API Key 场景."""
+        monkeypatch.setenv("PRIVATE_LLM_BASE_URL", "https://internal-llm.company.com/v1")
+        monkeypatch.setenv("PRIVATE_LLM_API_KEY", "")
+
+        s = Settings()
+        assert s.private_llm_base_url == "https://internal-llm.company.com/v1"
+        assert s.private_llm_api_key is None or s.private_llm_api_key == ""
+
+    def test_private_llm_invalid_url(self, monkeypatch):
+        """测试私有 LLM 无效 URL."""
+        monkeypatch.setenv("PRIVATE_LLM_BASE_URL", "invalid-url")
+
+        with pytest.raises(Exception):
+            Settings()

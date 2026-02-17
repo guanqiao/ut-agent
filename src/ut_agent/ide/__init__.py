@@ -10,6 +10,17 @@ from ut_agent.ide.vscode_extension import (
     CodeActionProvider,
     HoverProvider,
 )
+from ut_agent.ide.jetbrains_plugin import (
+    JetBrainsAction,
+    JetBrainsActionType,
+    JetBrainsEvent,
+    JetBrainsEventType,
+    JetBrainsPlugin,
+    ToolWindowFactory,
+    InspectionProvider,
+    IntentionActionProvider,
+    RunConfigurationProvider,
+)
 
 __all__ = [
     "VSCodeCommand",
@@ -20,4 +31,13 @@ __all__ = [
     "TestLensProvider",
     "CodeActionProvider",
     "HoverProvider",
+    "JetBrainsAction",
+    "JetBrainsActionType",
+    "JetBrainsEvent",
+    "JetBrainsEventType",
+    "JetBrainsPlugin",
+    "ToolWindowFactory",
+    "InspectionProvider",
+    "IntentionActionProvider",
+    "RunConfigurationProvider",
 ]

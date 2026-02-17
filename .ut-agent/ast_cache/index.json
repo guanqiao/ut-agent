@@ -2,356 +2,6 @@
   "version": "1.0",
   "entries": [
     {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmp_m6tzk7l.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmp_m6tzk7l.java",
-      "content_hash": "357dac12d848e2ba7fac337cccbe0bdc",
-      "language": "java",
-      "created_at": "2026-02-16T02:58:41.866425",
-      "last_accessed": "2026-02-16T02:58:41.866425",
-      "access_count": 0,
-      "size_bytes": 10123
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpqjjnnfg7.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpqjjnnfg7.java",
-      "content_hash": "357dac12d848e2ba7fac337cccbe0bdc",
-      "language": "java",
-      "created_at": "2026-02-16T02:58:42.616558",
-      "last_accessed": "2026-02-16T02:58:42.616558",
-      "access_count": 0,
-      "size_bytes": 10123
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpwxcq4ywp.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpwxcq4ywp.java",
-      "content_hash": "357dac12d848e2ba7fac337cccbe0bdc",
-      "language": "java",
-      "created_at": "2026-02-16T02:58:42.672735",
-      "last_accessed": "2026-02-16T02:58:42.672735",
-      "access_count": 0,
-      "size_bytes": 10123
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmptxkna2cz.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmptxkna2cz.java",
-      "content_hash": "357dac12d848e2ba7fac337cccbe0bdc",
-      "language": "java",
-      "created_at": "2026-02-16T02:58:42.679316",
-      "last_accessed": "2026-02-16T02:58:42.679316",
-      "access_count": 0,
-      "size_bytes": 10123
-    },
-    {
-      "cache_key": "typescript:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpu31p_ct7.ts",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpu31p_ct7.ts",
-      "content_hash": "f2a388698124cf625bd1e5cd4dc840d1",
-      "language": "typescript",
-      "created_at": "2026-02-16T02:58:42.687921",
-      "last_accessed": "2026-02-16T02:58:42.687921",
-      "access_count": 0,
-      "size_bytes": 10644
-    },
-    {
-      "cache_key": "typescript:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmplw26ni0u.ts",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmplw26ni0u.ts",
-      "content_hash": "f2a388698124cf625bd1e5cd4dc840d1",
-      "language": "typescript",
-      "created_at": "2026-02-16T02:58:42.693600",
-      "last_accessed": "2026-02-16T02:58:42.693600",
-      "access_count": 0,
-      "size_bytes": 10644
-    },
-    {
-      "cache_key": "typescript:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmp77s1jjv0.ts",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmp77s1jjv0.ts",
-      "content_hash": "f2a388698124cf625bd1e5cd4dc840d1",
-      "language": "typescript",
-      "created_at": "2026-02-16T02:58:42.698206",
-      "last_accessed": "2026-02-16T02:58:42.698206",
-      "access_count": 0,
-      "size_bytes": 10644
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-3\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-3\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:07:49.735965",
-      "last_accessed": "2026-02-16T03:07:49.735965",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-4\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-4\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:08:15.577932",
-      "last_accessed": "2026-02-16T03:08:15.577932",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-5\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-5\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:09:33.158582",
-      "last_accessed": "2026-02-16T03:09:33.158582",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpl76gqv2o.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\tmpl76gqv2o.java",
-      "content_hash": "2f71e04b87eb72dbe44ddb823438d917",
-      "language": "java",
-      "created_at": "2026-02-16T03:10:07.640105",
-      "last_accessed": "2026-02-16T03:10:07.640105",
-      "access_count": 0,
-      "size_bytes": 6538
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-6\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-6\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:10:26.270292",
-      "last_accessed": "2026-02-16T03:10:26.270292",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-7\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-7\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:10:49.719394",
-      "last_accessed": "2026-02-16T03:10:49.719394",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-8\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-8\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:11:05.553773",
-      "last_accessed": "2026-02-16T03:11:05.553773",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-9\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-9\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:28:03.957915",
-      "last_accessed": "2026-02-16T03:28:03.957915",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-10\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-10\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:47:01.030127",
-      "last_accessed": "2026-02-16T03:47:01.030127",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-11\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-11\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:48:30.942366",
-      "last_accessed": "2026-02-16T03:48:30.942366",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-12\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-12\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:49:25.096421",
-      "last_accessed": "2026-02-16T03:49:25.096421",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-14\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-14\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T03:51:07.873695",
-      "last_accessed": "2026-02-16T03:51:07.873695",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-15\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-15\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T08:56:42.656270",
-      "last_accessed": "2026-02-16T08:56:42.656270",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-16\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-16\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T08:57:04.815177",
-      "last_accessed": "2026-02-16T08:57:04.815177",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-17\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-17\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:13:59.426409",
-      "last_accessed": "2026-02-16T09:13:59.426409",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-18\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-18\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:15:35.868732",
-      "last_accessed": "2026-02-16T09:15:35.868732",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-19\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-19\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:24:21.465517",
-      "last_accessed": "2026-02-16T09:24:21.465517",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-20\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-20\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:25:58.106135",
-      "last_accessed": "2026-02-16T09:25:58.106135",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-21\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-21\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:26:09.818537",
-      "last_accessed": "2026-02-16T09:26:09.818537",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-22\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-22\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:28:59.176617",
-      "last_accessed": "2026-02-16T09:28:59.176617",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-23\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-23\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:29:12.588960",
-      "last_accessed": "2026-02-16T09:29:12.588960",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-24\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-24\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:29:51.616901",
-      "last_accessed": "2026-02-16T09:29:51.616901",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-25\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-25\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:34:28.742663",
-      "last_accessed": "2026-02-16T09:34:28.742663",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-26\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-26\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:35:54.020534",
-      "last_accessed": "2026-02-16T09:35:54.020534",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-27\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-27\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:39:14.245585",
-      "last_accessed": "2026-02-16T09:39:14.245585",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-28\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-28\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:40:47.511954",
-      "last_accessed": "2026-02-16T09:40:47.511954",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-29\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-29\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:43:11.310012",
-      "last_accessed": "2026-02-16T09:43:11.310012",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
-      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-30\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-30\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
-      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
-      "language": "java",
-      "created_at": "2026-02-16T09:44:17.712231",
-      "last_accessed": "2026-02-16T09:44:17.712231",
-      "access_count": 0,
-      "size_bytes": 706
-    },
-    {
       "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-31\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
       "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-31\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
       "content_hash": "88ab65e879c4c002e2d60977d72aee83",
@@ -518,6 +168,96 @@
       "language": "java",
       "created_at": "2026-02-17T00:17:07.838463",
       "last_accessed": "2026-02-17T00:17:07.838463",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-55\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-55\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T11:31:24.243279",
+      "last_accessed": "2026-02-17T11:31:24.243279",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-58\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-58\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T11:35:05.033316",
+      "last_accessed": "2026-02-17T11:35:05.033316",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-62\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-62\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T11:40:16.259978",
+      "last_accessed": "2026-02-17T11:40:16.259978",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-66\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-66\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T11:47:44.327621",
+      "last_accessed": "2026-02-17T11:47:44.327621",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-68\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-68\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T12:02:10.099118",
+      "last_accessed": "2026-02-17T12:02:10.099118",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-69\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-69\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T12:03:12.257197",
+      "last_accessed": "2026-02-17T12:03:12.257197",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-71\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-71\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T12:03:45.841874",
+      "last_accessed": "2026-02-17T12:03:45.841874",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-72\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-72\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T12:46:54.807929",
+      "last_accessed": "2026-02-17T12:46:54.807929",
+      "access_count": 0,
+      "size_bytes": 706
+    },
+    {
+      "cache_key": "java:C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-73\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "file_path": "C:\\Users\\dsy3d\\AppData\\Local\\Temp\\pytest-of-dsy3d\\pytest-73\\test_parse_java_ast_with_cache0\\test_files\\Test.java",
+      "content_hash": "88ab65e879c4c002e2d60977d72aee83",
+      "language": "java",
+      "created_at": "2026-02-17T12:59:46.668828",
+      "last_accessed": "2026-02-17T12:59:46.668828",
       "access_count": 0,
       "size_bytes": 706
     }

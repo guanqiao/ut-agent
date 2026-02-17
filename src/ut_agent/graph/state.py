@@ -61,6 +61,42 @@ class ChangeSummary:
     deleted_methods: List[MethodInfo] = field(default_factory=list)
 
 
+@dataclass
+class ProgressInfo:
+    current: int = 0
+    total: int = 0
+    percentage: float = 0.0
+    current_file: Optional[str] = None
+    stage: str = ""
+    message: str = ""
+    
+    def update(self, current: int, total: int, current_file: Optional[str] = None) -> None:
+        self.current = current
+        self.total = total
+        self.percentage = round(current / total * 100, 1) if total > 0 else 0
+        self.current_file = current_file
+
+
+@dataclass
+class StageMetrics:
+    stage_name: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_ms: float = 0.0
+    files_processed: int = 0
+    files_total: int = 0
+    success_count: int = 0
+    error_count: int = 0
+    
+    def start(self) -> None:
+        self.start_time = datetime.now()
+    
+    def complete(self) -> None:
+        self.end_time = datetime.now()
+        if self.start_time:
+            self.duration_ms = (self.end_time - self.start_time).total_seconds() * 1000
+
+
 class AgentState(TypedDict):
     """Agent 状态定义."""
 
@@ -96,3 +132,7 @@ class AgentState(TypedDict):
     output_path: Optional[str]
     summary: Optional[str]
     html_report_path: Optional[str]
+    
+    progress: Dict[str, Any]
+    stage_metrics: Dict[str, Any]
+    event_log: Annotated[List[Dict[str, Any]], add]

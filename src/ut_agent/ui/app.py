@@ -3,26 +3,27 @@
 import asyncio
 import sys
 from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, List
 
 import streamlit as st
 
-# 添加项目根目录到路径
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from ut_agent.graph import create_test_generation_graph, AgentState
 from ut_agent.models import list_available_providers
 from ut_agent.config import settings
+from ut_agent.utils.events import Event, EventType
+from ut_agent.utils.event_bus import event_bus
 
 
-# 页面配置
 st.set_page_config(
     page_title="UT-Agent: AI单元测试生成器",
     page_icon="🧪",
     layout="wide",
 )
 
-# 样式
 st.markdown("""
 <style>
 .main-header {
@@ -54,6 +55,21 @@ st.markdown("""
     border: 1px solid #f5c6cb;
     color: #721c24;
 }
+.stage-card {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 0.5rem 0;
+}
+.stage-running {
+    border-left: 4px solid #ffc107;
+}
+.stage-completed {
+    border-left: 4px solid #28a745;
+}
+.stage-pending {
+    border-left: 4px solid #6c757d;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,6 +82,21 @@ def init_session_state() -> None:
         st.session_state.workflow_result = None
     if "logs" not in st.session_state:
         st.session_state.logs = []
+    if "stage_progress" not in st.session_state:
+        st.session_state.stage_progress = {
+            "detect_project": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "analyze_code": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "generate_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "save_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "execute_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "analyze_coverage": {"status": "pending", "current": 0, "total": 0, "message": ""},
+        }
+    if "current_stage" not in st.session_state:
+        st.session_state.current_stage = ""
+    if "start_time" not in st.session_state:
+        st.session_state.start_time = None
+    if "metrics" not in st.session_state:
+        st.session_state.metrics = {}
 
 
 def render_header() -> None:
@@ -200,7 +231,20 @@ def render_main_content(config: dict) -> None:
 def run_workflow(project_path: str, project_type: str, config: dict) -> None:
     """运行工作流."""
     try:
-        # 创建初始状态
+        event_bus.reset()
+        
+        st.session_state.stage_progress = {
+            "detect_project": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "analyze_code": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "generate_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "save_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "execute_tests": {"status": "pending", "current": 0, "total": 0, "message": ""},
+            "analyze_coverage": {"status": "pending", "current": 0, "total": 0, "message": ""},
+        }
+        st.session_state.current_stage = ""
+        st.session_state.start_time = datetime.now()
+        st.session_state.metrics = {}
+        
         initial_state: AgentState = {
             "project_path": project_path,
             "project_type": project_type if project_type != "auto" else "",
@@ -219,12 +263,19 @@ def run_workflow(project_path: str, project_type: str, config: dict) -> None:
             "improvement_plan": None,
             "output_path": None,
             "summary": None,
+            "progress": {},
+            "stage_metrics": {},
+            "event_log": [],
+            "code_changes": [],
+            "change_summaries": [],
+            "incremental": False,
+            "base_ref": None,
+            "head_ref": None,
+            "html_report_path": None,
         }
 
-        # 创建图
         graph = create_test_generation_graph()
 
-        # 运行
         with st.spinner("正在生成测试..."):
             result = asyncio.run(run_graph(graph, initial_state, config))
 
@@ -236,9 +287,51 @@ def run_workflow(project_path: str, project_type: str, config: dict) -> None:
         st.session_state.workflow_started = False
 
 
+def handle_event(event: Event) -> None:
+    """处理事件."""
+    event_type = event.event_type
+    data = event.data
+    
+    if event_type == EventType.FILE_ANALYSIS_STARTED:
+        st.session_state.current_stage = "analyze_code"
+        st.session_state.stage_progress["analyze_code"]["status"] = "running"
+        st.session_state.stage_progress["analyze_code"]["total"] = data.get("total_files", 0)
+    
+    elif event_type == EventType.FILE_ANALYSIS_COMPLETED:
+        st.session_state.stage_progress["analyze_code"]["status"] = "completed"
+    
+    elif event_type == EventType.TEST_GENERATION_STARTED:
+        st.session_state.current_stage = "generate_tests"
+        st.session_state.stage_progress["generate_tests"]["status"] = "running"
+        st.session_state.stage_progress["generate_tests"]["total"] = data.get("total_files", 0)
+    
+    elif event_type == EventType.TEST_GENERATION_COMPLETED:
+        st.session_state.stage_progress["generate_tests"]["status"] = "completed"
+    
+    elif event_type == EventType.NODE_PROGRESS:
+        stage = data.get("stage", "")
+        if stage in st.session_state.stage_progress:
+            st.session_state.stage_progress[stage]["current"] = data.get("current", 0)
+            st.session_state.stage_progress[stage]["total"] = data.get("total", 0)
+            st.session_state.stage_progress[stage]["message"] = data.get("message", "")
+    
+    elif event_type == EventType.PERFORMANCE_METRIC:
+        metric_name = data.get("metric_name", "")
+        value = data.get("value", 0)
+        st.session_state.metrics[metric_name] = value
+    
+    elif event_type == EventType.ERROR_OCCURRED:
+        error_msg = data.get("error_message", "Unknown error")
+        st.session_state.logs.append(f"❌ ERROR: {error_msg}")
+
+
 async def run_graph(graph, initial_state: AgentState, config: dict) -> dict:
     """异步运行图."""
+    event_bus.subscribe_all(handle_event)
+    
     result = None
+    progress_placeholder = st.empty()
+    
     async for event in graph.astream(
         initial_state,
         config={"configurable": {"llm_provider": config["provider"]}},
@@ -250,8 +343,52 @@ async def run_graph(graph, initial_state: AgentState, config: dict) -> dict:
                 log_entry = f"[{node_name}] {status}: {message}"
                 st.session_state.logs.append(log_entry)
                 result = node_data
-
+                
+                if node_name in st.session_state.stage_progress:
+                    st.session_state.stage_progress[node_name]["status"] = "completed"
+                
+                with progress_placeholder.container():
+                    render_progress_panel()
+    
     return result
+
+
+def render_progress_panel() -> None:
+    """渲染进度面板."""
+    st.markdown("### 📊 执行进度")
+    
+    if st.session_state.start_time:
+        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+        st.markdown(f"**已用时间:** {elapsed:.1f}秒")
+    
+    stage_names = {
+        "detect_project": "🔍 项目检测",
+        "analyze_code": "📊 代码分析",
+        "generate_tests": "🧪 测试生成",
+        "save_tests": "💾 保存测试",
+        "execute_tests": "⚡ 执行测试",
+        "analyze_coverage": "📈 覆盖率分析",
+    }
+    
+    cols = st.columns(3)
+    for idx, (stage_name, stage_data) in enumerate(st.session_state.stage_progress.items()):
+        col = cols[idx % 3]
+        with col:
+            status = stage_data["status"]
+            current = stage_data["current"]
+            total = stage_data["total"]
+            message = stage_data["message"]
+            
+            if status == "completed":
+                st.success(f"{stage_names[stage_name]} ✅")
+            elif status == "running":
+                if total > 0:
+                    progress = current / total
+                    st.progress(progress, text=f"{stage_names[stage_name]} [{current}/{total}]")
+                else:
+                    st.info(f"{stage_names[stage_name]} 🔄")
+            else:
+                st.markdown(f"⏳ {stage_names[stage_name]}")
 
 
 def render_results(result: dict) -> None:
@@ -259,7 +396,6 @@ def render_results(result: dict) -> None:
     st.markdown("---")
     st.header("📈 执行结果")
 
-    # 状态
     status = result.get("status", "")
     if status == "completed":
         st.success("✅ 测试生成完成!")
@@ -270,7 +406,6 @@ def render_results(result: dict) -> None:
     else:
         st.info(f"状态: {status}")
 
-    # 覆盖率报告
     coverage_report = result.get("coverage_report")
     if coverage_report:
         st.subheader("📊 覆盖率统计")
@@ -296,14 +431,46 @@ def render_results(result: dict) -> None:
                 "方法覆盖率",
                 f"{coverage_report.method_coverage:.1f}%",
             )
+    
+    if st.session_state.metrics:
+        st.subheader("⏱️ 性能指标")
+        
+        metric_names = {
+            "analyze_code_duration_ms": "代码分析耗时",
+            "test_generation_duration_ms": "测试生成耗时",
+            "save_tests_duration_ms": "保存测试耗时",
+            "tests_generated_count": "生成测试数量",
+        }
+        
+        cols = st.columns(4)
+        for idx, (metric_name, value) in enumerate(st.session_state.metrics.items()):
+            col = cols[idx % 4]
+            with col:
+                display_name = metric_names.get(metric_name, metric_name)
+                if "duration" in metric_name:
+                    display_value = f"{value:.0f}ms"
+                else:
+                    display_value = str(value)
+                st.metric(display_name, display_value)
+    
+    stage_metrics = result.get("stage_metrics", {})
+    if stage_metrics:
+        st.subheader("📋 阶段详情")
+        
+        for stage_name, metrics in stage_metrics.items():
+            if metrics:
+                with st.expander(f"📌 {stage_name}"):
+                    for key, value in metrics.items():
+                        if isinstance(value, float):
+                            st.markdown(f"- **{key}:** {value:.2f}")
+                        else:
+                            st.markdown(f"- **{key}:** {value}")
 
-    # 摘要
     summary = result.get("summary")
     if summary:
         st.subheader("📝 摘要")
         st.text(summary)
 
-    # 生成的测试文件
     generated_tests = result.get("generated_tests", [])
     if generated_tests:
         st.subheader(f"🧪 生成的测试文件 ({len(generated_tests)}个)")

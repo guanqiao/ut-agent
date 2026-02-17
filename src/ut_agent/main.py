@@ -19,6 +19,8 @@ from ut_agent.tools.test_executor import (
     check_maven_environment,
     check_node_environment,
 )
+from ut_agent.utils.progress_monitor import create_progress_monitor
+from ut_agent.utils.event_bus import event_bus
 
 app = typer.Typer(
     name="ut-agent",
@@ -837,7 +839,8 @@ async def run_generation_workflow(
     html_report: bool = False,
 ) -> None:
     """运行生成工作流."""
-    # 创建初始状态
+    event_bus.reset()
+    
     initial_state: AgentState = {
         "project_path": project_path,
         "project_type": project_type if project_type != "auto" else "",
@@ -862,19 +865,17 @@ async def run_generation_workflow(
         "output_path": None,
         "summary": None,
         "html_report_path": None,
+        "progress": {},
+        "stage_metrics": {},
+        "event_log": [],
     }
 
-    # 创建图
     graph = create_test_generation_graph()
+    
+    monitor = create_progress_monitor(console)
+    monitor.start()
 
-    # 运行
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("[cyan]正在生成测试...", total=None)
-
+    try:
         result = None
         async for event in graph.astream(
             initial_state,
@@ -882,16 +883,15 @@ async def run_generation_workflow(
         ):
             for node_name, node_data in event.items():
                 if isinstance(node_data, dict):
-                    status = node_data.get("status", "")
-                    message = node_data.get("message", "")
-                    progress.update(task, description=f"[cyan][{node_name}] {message}")
                     result = node_data
 
-        progress.update(task, description="[green]✓ 完成!")
+    finally:
+        monitor.stop()
+        console.print("[green]✓ 完成![/green]")
 
-    # 显示结果
     if result:
         display_results(result)
+        display_performance_summary(monitor.get_summary(), result)
 
 
 def display_results(result: dict) -> None:
@@ -966,6 +966,66 @@ def display_results(result: dict) -> None:
         console.print()
         console.print("[bold cyan]📝 摘要[/bold cyan]")
         console.print(summary)
+
+
+def display_performance_summary(monitor_summary: dict, result: dict) -> None:
+    """显示性能摘要."""
+    console.print()
+    console.print(Panel.fit(
+        "[bold cyan]⏱️ 性能统计[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    total_duration = monitor_summary.get("duration_ms", 0)
+    if total_duration > 0:
+        seconds = total_duration / 1000
+        console.print(f"[bold]总耗时:[/bold] {seconds:.2f}秒")
+    
+    stages = monitor_summary.get("stages", {})
+    if stages:
+        console.print()
+        console.print("[bold]阶段耗时:[/bold]")
+        
+        stage_names = {
+            "detect_project": "🔍 项目检测",
+            "analyze_code": "📊 代码分析",
+            "generate_tests": "🧪 测试生成",
+            "save_tests": "💾 保存测试",
+            "execute_tests": "⚡ 执行测试",
+            "analyze_coverage": "📈 覆盖率分析",
+        }
+        
+        table = Table(box=box.SIMPLE)
+        table.add_column("阶段", style="cyan")
+        table.add_column("耗时", style="yellow")
+        table.add_column("文件处理", style="green")
+        
+        for stage_name, stage_data in stages.items():
+            display_name = stage_names.get(stage_name, stage_name)
+            duration_ms = stage_data.get("duration_ms", 0)
+            duration_str = f"{duration_ms:.0f}ms" if duration_ms > 0 else "-"
+            
+            processed = stage_data.get("files_processed", 0)
+            total = stage_data.get("files_total", 0)
+            files_str = f"{processed}/{total}" if total > 0 else "-"
+            
+            table.add_row(display_name, duration_str, files_str)
+        
+        console.print(table)
+    
+    stage_metrics = result.get("stage_metrics", {})
+    if stage_metrics:
+        console.print()
+        console.print("[bold]详细指标:[/bold]")
+        
+        for stage_name, metrics in stage_metrics.items():
+            if metrics:
+                console.print(f"  [cyan]{stage_name}:[/cyan]")
+                for key, value in metrics.items():
+                    if isinstance(value, float):
+                        console.print(f"    - {key}: {value:.2f}")
+                    else:
+                        console.print(f"    - {key}: {value}")
 
 
 if __name__ == "__main__":

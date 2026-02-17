@@ -9,6 +9,8 @@ import pytest
 from ut_agent.tools.test_generator import (
     generate_java_test,
     generate_frontend_test,
+    generate_incremental_java_test,
+    generate_incremental_frontend_test,
     format_java_methods,
     format_java_fields,
     format_ts_functions,
@@ -365,3 +367,184 @@ class TestGenerateFrontendTest:
 
         assert isinstance(result, GeneratedTestFile)
         assert "should cover gap" in result.test_code
+
+
+class TestGenerateIncrementalJavaTest:
+    """generate_incremental_java_test 函数测试."""
+
+    @patch("ut_agent.tools.test_generator.TestAnalyzer")
+    @patch("ut_agent.tools.test_generator.format_existing_tests_for_prompt")
+    def test_generate_incremental_java_test_new_methods(self, mock_format, mock_analyzer_class):
+        """测试增量生成 Java 测试 - 新增方法."""
+        mock_llm = Mock()
+        mock_response = Mock(content="@Test\nvoid testNewMethod() {\n}")
+        mock_llm.invoke.return_value = mock_response
+
+        mock_analyzer = Mock()
+        mock_analyzer.analyze_existing_tests.return_value = Mock(
+            tested_methods={},
+            untested_methods=["newMethod"],
+            manual_tests=[],
+        )
+        mock_analyzer.extract_test_patterns.return_value = {"naming_convention": "test_prefix"}
+        mock_analyzer_class.return_value = mock_analyzer
+
+        mock_format.return_value = "无已有测试"
+
+        file_analysis = {
+            "class_name": "Test",
+            "package": "com.example",
+            "methods": [
+                {"name": "existingMethod", "is_public": True},
+                {"name": "newMethod", "is_public": True},
+            ],
+            "fields": [],
+            "file_path": "/src/main/java/com/example/Test.java",
+        }
+
+        result = generate_incremental_java_test(
+            file_analysis,
+            mock_llm,
+            existing_test_path=None,
+            added_methods=["newMethod"],
+            modified_methods=[],
+            use_boundary_values=False,
+        )
+
+        assert isinstance(result, GeneratedTestFile)
+        assert "testNewMethod" in result.test_code
+        mock_llm.invoke.assert_called_once()
+
+    @patch("ut_agent.tools.test_generator.TestAnalyzer")
+    @patch("ut_agent.tools.test_generator.format_existing_tests_for_prompt")
+    def test_generate_incremental_java_test_with_existing(self, mock_format, mock_analyzer_class):
+        """测试增量生成 Java 测试 - 有已有测试."""
+        mock_llm = Mock()
+        mock_response = Mock(content="@Test\nvoid testModifiedMethod() {\n}")
+        mock_llm.invoke.return_value = mock_response
+
+        mock_analyzer = Mock()
+        mock_analyzer.analyze_existing_tests.return_value = Mock(
+            tested_methods={"existingMethod": ["testExistingMethod"]},
+            untested_methods=[],
+            manual_tests=[],
+        )
+        mock_analyzer.extract_test_patterns.return_value = {"naming_convention": "given_when_then"}
+        mock_analyzer_class.return_value = mock_analyzer
+
+        mock_format.return_value = "已覆盖的方法:\n  - existingMethod"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            existing_test = Path(temp_dir) / "TestTest.java"
+            existing_test.write_text("public class TestTest { @Test void testExistingMethod() {} }")
+
+            file_analysis = {
+                "class_name": "Test",
+                "package": "com.example",
+                "methods": [
+                    {"name": "existingMethod", "is_public": True},
+                    {"name": "modifiedMethod", "is_public": True},
+                ],
+                "fields": [],
+                "file_path": "/src/main/java/com/example/Test.java",
+            }
+
+            result = generate_incremental_java_test(
+                file_analysis,
+                mock_llm,
+                existing_test_path=str(existing_test),
+                added_methods=[],
+                modified_methods=["modifiedMethod"],
+                use_boundary_values=False,
+            )
+
+            assert isinstance(result, GeneratedTestFile)
+
+
+class TestGenerateIncrementalFrontendTest:
+    """generate_incremental_frontend_test 函数测试."""
+
+    @patch("ut_agent.tools.test_generator.TestAnalyzer")
+    @patch("ut_agent.tools.test_generator.format_existing_tests_for_prompt")
+    def test_generate_incremental_frontend_test(self, mock_format, mock_analyzer_class):
+        """测试增量生成前端测试."""
+        mock_llm = Mock()
+        mock_response = Mock(content="it('should work for newFunc', () => {});")
+        mock_llm.invoke.return_value = mock_response
+
+        mock_analyzer = Mock()
+        mock_analyzer.analyze_existing_tests.return_value = Mock(
+            tested_methods={},
+            untested_methods=["newFunc"],
+            manual_tests=[],
+        )
+        mock_analyzer.extract_test_patterns.return_value = {"naming_convention": "should_style"}
+        mock_analyzer_class.return_value = mock_analyzer
+
+        mock_format.return_value = "无已有测试"
+
+        file_analysis = {
+            "file_path": "/src/utils.ts",
+            "functions": [
+                {"name": "existingFunc", "is_exported": True},
+                {"name": "newFunc", "is_exported": True},
+            ],
+            "is_vue": False,
+        }
+
+        result = generate_incremental_frontend_test(
+            file_analysis,
+            "typescript",
+            mock_llm,
+            existing_test_path=None,
+            added_functions=["newFunc"],
+            modified_functions=[],
+            use_boundary_values=False,
+        )
+
+        assert isinstance(result, GeneratedTestFile)
+        assert "should work for newFunc" in result.test_code
+
+    @patch("ut_agent.tools.test_generator.TestAnalyzer")
+    @patch("ut_agent.tools.test_generator.format_existing_tests_for_prompt")
+    def test_generate_incremental_frontend_test_vue(self, mock_format, mock_analyzer_class):
+        """测试增量生成 Vue 组件测试."""
+        mock_llm = Mock()
+        mock_response = Mock(content="it('should handle newMethod', () => {});")
+        mock_llm.invoke.return_value = mock_response
+
+        mock_analyzer = Mock()
+        mock_analyzer.analyze_existing_tests.return_value = Mock(
+            tested_methods={},
+            untested_methods=["newMethod"],
+            manual_tests=[],
+        )
+        mock_analyzer.extract_test_patterns.return_value = {"naming_convention": "should_style"}
+        mock_analyzer_class.return_value = mock_analyzer
+
+        mock_format.return_value = "无已有测试"
+
+        file_analysis = {
+            "file_path": "/src/Component.vue",
+            "functions": [
+                {"name": "newMethod", "is_exported": True},
+            ],
+            "is_vue": True,
+            "component_info": {"has_props": True},
+        }
+
+        result = generate_incremental_frontend_test(
+            file_analysis,
+            "vue",
+            mock_llm,
+            existing_test_path=None,
+            added_functions=["newMethod"],
+            modified_functions=[],
+            use_boundary_values=False,
+        )
+
+        assert isinstance(result, GeneratedTestFile)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

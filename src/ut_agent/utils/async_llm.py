@@ -4,13 +4,15 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable, AsyncGenerator
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from ut_agent.exceptions import LLMError, LLMRateLimitError, LLMResponseError
 from ut_agent.utils import get_logger
+from ut_agent.utils.event_bus import event_bus, emit_metric
+from ut_agent.utils.events import EventType, LLMStreamingEvent
 
 logger = get_logger("async_llm")
 
@@ -71,6 +73,29 @@ class LLMCallResult:
     @property
     def total_tokens(self) -> int:
         """总 token 数."""
+        return self.prompt_tokens + self.completion_tokens
+
+
+@dataclass
+class LLMStreamingResult:
+    """LLM 流式调用结果."""
+    
+    status: LLMCallStatus = LLMCallStatus.PENDING
+    content: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    errors: List[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=datetime.now)
+    duration_ms: float = 0.0
+    first_token_latency_ms: float = 0.0
+    tokens_per_second: float = 0.0
+    
+    @property
+    def success(self) -> bool:
+        return self.status == LLMCallStatus.SUCCESS
+    
+    @property
+    def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
 
 
@@ -406,3 +431,210 @@ class AsyncLLMCaller:
             "total_tokens": total_tokens,
             "avg_duration_ms": total_duration / len(self._call_history),
         }
+
+    async def call_streaming(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        on_chunk: Optional[Callable[[str], None]] = None,
+        **kwargs: Any,
+    ) -> LLMStreamingResult:
+        """流式调用 LLM，支持实时进度回调.
+        
+        Args:
+            prompt: 用户提示
+            system_prompt: 系统提示
+            temperature: 温度参数
+            on_chunk: 每个chunk的回调函数
+            **kwargs: 其他参数
+            
+        Returns:
+            LLMStreamingResult: 流式调用结果
+        """
+        messages: List[BaseMessage] = []
+        if system_prompt:
+            messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=prompt))
+        
+        return await self._stream_with_events(messages, temperature, on_chunk, **kwargs)
+    
+    async def _stream_with_events(
+        self,
+        messages: List[BaseMessage],
+        temperature: Optional[float] = None,
+        on_chunk: Optional[Callable[[str], None]] = None,
+        **kwargs: Any,
+    ) -> LLMStreamingResult:
+        """带事件发射的流式调用."""
+        result = LLMStreamingResult()
+        start_time = datetime.now()
+        first_token_time: Optional[datetime] = None
+        tokens_generated = 0
+        content_chunks: List[str] = []
+        
+        invoke_kwargs = kwargs.copy()
+        if temperature is not None:
+            invoke_kwargs["temperature"] = temperature
+        
+        provider = getattr(self._llm, '__class__', type(self._llm)).__name__
+        model = getattr(self._llm, 'model_name', getattr(self._llm, 'model', 'unknown'))
+        
+        event_bus.emit_simple(EventType.LLM_CALL_STARTED, {
+            "provider": provider,
+            "model": model,
+            "message_count": len(messages),
+        }, source="AsyncLLMCaller")
+        
+        try:
+            async with self._semaphore:
+                async for chunk in self._llm.astream(messages, **invoke_kwargs):
+                    chunk_content = ""
+                    if hasattr(chunk, "content"):
+                        chunk_content = str(chunk.content)
+                    elif isinstance(chunk, str):
+                        chunk_content = chunk
+                    
+                    if chunk_content:
+                        if not first_token_time:
+                            first_token_time = datetime.now()
+                        
+                        content_chunks.append(chunk_content)
+                        tokens_generated += 1
+                        
+                        event_bus.emit(LLMStreamingEvent(
+                            provider=provider,
+                            model=model,
+                            chunk=chunk_content[:50] if len(chunk_content) > 50 else chunk_content,
+                            tokens_generated=tokens_generated,
+                            source="AsyncLLMCaller",
+                        ))
+                        
+                        if on_chunk:
+                            try:
+                                on_chunk(chunk_content)
+                            except Exception as e:
+                                logger.warning(f"Chunk callback error: {e}")
+        
+            end_time = datetime.now()
+            result.duration_ms = (end_time - start_time).total_seconds() * 1000
+            
+            if first_token_time:
+                result.first_token_latency_ms = (first_token_time - start_time).total_seconds() * 1000
+            
+            if tokens_generated > 0 and result.duration_ms > 0:
+                result.tokens_per_second = tokens_generated / (result.duration_ms / 1000)
+            
+            result.content = "".join(content_chunks)
+            result.completion_tokens = tokens_generated
+            result.status = LLMCallStatus.SUCCESS
+            
+            event_bus.emit_simple(EventType.LLM_CALL_COMPLETED, {
+                "provider": provider,
+                "model": model,
+                "total_tokens": tokens_generated,
+                "duration_ms": result.duration_ms,
+                "first_token_latency_ms": result.first_token_latency_ms,
+                "tokens_per_second": result.tokens_per_second,
+            }, source="AsyncLLMCaller")
+            
+            emit_metric(
+                metric_name="llm_call_duration_ms",
+                value=result.duration_ms,
+                unit="ms",
+                tags={"provider": provider, "streaming": "true"},
+                source="AsyncLLMCaller",
+            )
+            
+            emit_metric(
+                metric_name="llm_tokens_generated",
+                value=tokens_generated,
+                unit="tokens",
+                tags={"provider": provider},
+                source="AsyncLLMCaller",
+            )
+            
+            return result
+            
+        except asyncio.TimeoutError:
+            result.status = LLMCallStatus.TIMEOUT
+            result.errors.append(f"Streaming call timed out after {self._config.timeout} seconds")
+            result.duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            event_bus.emit_simple(EventType.LLM_CALL_FAILED, {
+                "provider": provider,
+                "error": "timeout",
+                "duration_ms": result.duration_ms,
+            }, source="AsyncLLMCaller")
+            
+            return result
+            
+        except Exception as e:
+            result.status = LLMCallStatus.FAILED
+            result.errors.append(str(e))
+            result.duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            event_bus.emit_simple(EventType.LLM_CALL_FAILED, {
+                "provider": provider,
+                "error": str(e),
+                "duration_ms": result.duration_ms,
+            }, source="AsyncLLMCaller")
+            
+            logger.error(f"LLM streaming call error: {e}")
+            return result
+    
+    async def stream(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[str, None]:
+        """异步生成器方式的流式调用.
+        
+        Args:
+            prompt: 用户提示
+            system_prompt: 系统提示
+            temperature: 温度参数
+            **kwargs: 其他参数
+            
+        Yields:
+            str: 每个chunk的内容
+        """
+        messages: List[BaseMessage] = []
+        if system_prompt:
+            messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=prompt))
+        
+        invoke_kwargs = kwargs.copy()
+        if temperature is not None:
+            invoke_kwargs["temperature"] = temperature
+        
+        provider = getattr(self._llm, '__class__', type(self._llm)).__name__
+        model = getattr(self._llm, 'model_name', getattr(self._llm, 'model', 'unknown'))
+        
+        event_bus.emit_simple(EventType.LLM_CALL_STARTED, {
+            "provider": provider,
+            "model": model,
+            "message_count": len(messages),
+        }, source="AsyncLLMCaller")
+        
+        try:
+            async with self._semaphore:
+                async for chunk in self._llm.astream(messages, **invoke_kwargs):
+                    chunk_content = ""
+                    if hasattr(chunk, "content"):
+                        chunk_content = str(chunk.content)
+                    elif isinstance(chunk, str):
+                        chunk_content = chunk
+                    
+                    if chunk_content:
+                        yield chunk_content
+                        
+        except Exception as e:
+            logger.error(f"LLM stream error: {e}")
+            event_bus.emit_simple(EventType.LLM_CALL_FAILED, {
+                "provider": provider,
+                "error": str(e),
+            }, source="AsyncLLMCaller")
+            raise

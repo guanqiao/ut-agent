@@ -451,20 +451,17 @@ class TestFileMapper:
         """
         result_lines = existing_content.split("\n")
 
-        # 处理删除的方法 - 标记为废弃
         for method in deleted_methods:
             test_method = mapping.method_mappings.get(method.name)
             if test_method:
                 self._mark_test_deprecated(result_lines, test_method)
 
-        # 处理修改的方法 - 如果未手工修改则更新
         for old_method, new_method in modified_methods:
             test_method = mapping.method_mappings.get(old_method.name)
             if test_method:
                 if not self._is_test_manually_modified(
                     existing_content, test_method
                 ):
-                    # 替换测试方法
                     new_test_method = self._extract_test_method(
                         new_content, test_method
                     )
@@ -473,34 +470,211 @@ class TestFileMapper:
                             result_lines, test_method, new_test_method
                         )
 
-        # 处理新增的方法 - 追加到文件
         for method in added_methods:
-            # 尝试提取测试方法
-            new_test_method = self._extract_test_method_for_source_method(
+            new_test_methods = self._extract_all_test_methods_for_source(
                 new_content, method.name
             )
-            if new_test_method:
-                result_lines.extend(["", ""])  # 空行
-                result_lines.extend(new_test_method.split("\n"))
-            else:
-                # 如果提取失败，直接从新测试内容中查找
-                if "test" + method.name.capitalize() in new_content:
-                    # 简单处理：直接追加新测试内容的相关部分
-                    lines = new_content.split("\n")
-                    in_method = False
-                    method_lines = []
-                    for line in lines:
-                        if "test" + method.name.capitalize() in line:
-                            in_method = True
-                        if in_method:
-                            method_lines.append(line)
-                            if "}" in line and len(method_lines) > 1:
-                                break
-                    if method_lines:
-                        result_lines.extend(["", ""])
-                        result_lines.extend(method_lines)
+            
+            for new_test_method in new_test_methods:
+                if not self._is_test_duplicate(result_lines, new_test_method):
+                    insert_pos = self._find_insert_position(result_lines, method.name)
+                    result_lines = self._insert_test_method_at(
+                        result_lines, new_test_method, insert_pos
+                    )
 
         return "\n".join(result_lines)
+
+    def _extract_all_test_methods_for_source(
+        self, test_content: str, source_method: str
+    ) -> List[str]:
+        """提取源方法对应的所有测试方法.
+
+        Args:
+            test_content: 测试内容
+            source_method: 源方法名
+
+        Returns:
+            测试方法内容列表
+        """
+        methods = []
+        possible_names = [
+            f"test{source_method.capitalize()}",
+            f"test{source_method[0].upper()}{source_method[1:]}" if source_method else "",
+            f"{source_method}Test",
+            f"should{source_method.capitalize()}",
+            f"given.*when.*{source_method}.*then",
+            f"test_{source_method}",
+        ]
+        
+        possible_names = [n for n in possible_names if n]
+        
+        for pattern_str in possible_names:
+            if ".*" in pattern_str:
+                pattern = re.compile(pattern_str, re.IGNORECASE)
+                lines = test_content.split("\n")
+                for i, line in enumerate(lines):
+                    if pattern.search(line):
+                        method_content = self._extract_test_method_from_line(lines, i)
+                        if method_content:
+                            methods.append(method_content)
+            else:
+                content = self._extract_test_method(test_content, pattern_str)
+                if content:
+                    methods.append(content)
+        
+        if not methods:
+            lines = test_content.split("\n")
+            for i, line in enumerate(lines):
+                if source_method.lower() in line.lower() and ("@Test" in line or "void test" in line or "it(" in line):
+                    method_content = self._extract_test_method_from_line(lines, i)
+                    if method_content:
+                        methods.append(method_content)
+
+        return methods
+
+    def _extract_test_method_from_line(
+        self, lines: List[str], start_idx: int
+    ) -> Optional[str]:
+        """从指定行开始提取测试方法.
+
+        Args:
+            lines: 代码行列表
+            start_idx: 起始索引
+
+        Returns:
+            方法内容
+        """
+        actual_start = start_idx
+        for i in range(start_idx, -1, -1):
+            if "@Test" in lines[i] or "@DisplayName" in lines[i]:
+                actual_start = i
+            elif lines[i].strip() and not lines[i].strip().startswith("@"):
+                break
+
+        brace_count = 0
+        end_idx = actual_start
+        found_open_brace = False
+
+        for i in range(actual_start, len(lines)):
+            line = lines[i]
+            brace_count += line.count("{") - line.count("}")
+            if "{" in line:
+                found_open_brace = True
+            if found_open_brace and brace_count == 0:
+                end_idx = i
+                break
+
+        return "\n".join(lines[actual_start : end_idx + 1])
+
+    def _is_test_duplicate(self, lines: List[str], new_test_method: str) -> bool:
+        """检查测试方法是否已存在.
+
+        Args:
+            lines: 现有代码行列表
+            new_test_method: 新测试方法内容
+
+        Returns:
+            是否重复
+        """
+        new_method_name = self._extract_method_name(new_test_method)
+        if not new_method_name:
+            return False
+
+        existing_content = "\n".join(lines)
+        method_pattern = re.compile(
+            rf"(@Test\s+)?(?:public\s+)?void\s+{re.escape(new_method_name)}\s*\("
+        )
+        
+        return bool(method_pattern.search(existing_content))
+
+    def _extract_method_name(self, method_content: str) -> Optional[str]:
+        """从测试方法内容中提取方法名.
+
+        Args:
+            method_content: 方法内容
+
+        Returns:
+            方法名
+        """
+        pattern = re.compile(r"void\s+(\w+)\s*\(")
+        match = pattern.search(method_content)
+        if match:
+            return match.group(1)
+        return None
+
+    def _find_insert_position(self, lines: List[str], method_name: str) -> int:
+        """找到测试方法的最佳插入位置.
+
+        Args:
+            lines: 代码行列表
+            method_name: 方法名
+
+        Returns:
+            插入位置索引
+        """
+        last_test_end = -1
+        brace_count = 0
+        in_method = False
+        method_start = -1
+
+        for i, line in enumerate(lines):
+            if "@Test" in line:
+                in_method = True
+                method_start = i
+            
+            if in_method:
+                brace_count += line.count("{") - line.count("}")
+                if brace_count == 0 and "{" in "\n".join(lines[method_start:i+1]):
+                    last_test_end = i
+                    in_method = False
+
+        if last_test_end >= 0:
+            return last_test_end + 1
+
+        class_end = self._find_class_end_position(lines)
+        return class_end - 1
+
+    def _find_class_end_position(self, lines: List[str]) -> int:
+        """找到类的结束位置.
+
+        Args:
+            lines: 代码行列表
+
+        Returns:
+            类结束位置
+        """
+        brace_count = 0
+        class_started = False
+
+        for i, line in enumerate(lines):
+            if re.search(r"(?:public\s+)?class\s+\w+", line):
+                class_started = True
+            
+            if class_started:
+                brace_count += line.count("{") - line.count("}")
+                if brace_count == 0:
+                    return i
+
+        return len(lines) - 1
+
+    def _insert_test_method_at(
+        self, lines: List[str], method_content: str, position: int
+    ) -> List[str]:
+        """在指定位置插入测试方法.
+
+        Args:
+            lines: 代码行列表
+            method_content: 方法内容
+            position: 插入位置
+
+        Returns:
+            更新后的代码行列表
+        """
+        method_lines = method_content.strip().split("\n")
+        
+        new_lines = lines[:position] + [""] + method_lines + [""] + lines[position:]
+        
+        return new_lines
 
     def _mark_test_deprecated(self, lines: List[str], test_method: str) -> None:
         """标记测试为废弃.

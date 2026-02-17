@@ -337,6 +337,7 @@ print(f"LLM 缓存最大大小: {settings.llm_cache_max_size}")
 | `deepseek_model` | DeepSeek 模型 | "deepseek-chat" |
 | `ollama_model` | Ollama 模型 | "llama3" |
 | `ollama_base_url` | Ollama 基础 URL | "http://localhost:11434" |
+| `ca_cert_path` | CA 证书路径（可选） | None |
 | `default_coverage_target` | 默认覆盖率目标 | 80.0 |
 | `max_iterations` | 最大迭代次数 | 5 |
 | `temperature` | 温度参数 | 0.7 |
@@ -433,7 +434,29 @@ LLM_MAX_RETRY_DELAY=60
 MAX_CONCURRENT_THREADS=4
 ```
 
-### 3.2 运行时配置
+### 3.3 SSL/TLS 配置
+
+在需要自定义 CA 证书的场景下（如企业内网、代理服务器等），可以配置 CA 证书路径：
+
+```env
+# CA 证书配置（可选）
+CA_CERT_PATH=/path/to/your/ca-cert.pem
+```
+
+**注意事项：**
+
+- `CA_CERT_PATH` 为可选配置，不配置时使用系统默认证书验证
+- 路径必须是绝对路径
+- 证书文件必须存在且可读
+- 配置后，OpenAI 和 DeepSeek 提供商将使用指定的 CA 证书进行 HTTPS 请求验证
+
+**使用场景：**
+
+1. 企业内网环境，需要通过代理访问外部 API
+2. 自建 CA 证书的私有环境
+3. 需要进行 SSL/TLS 流量审计的安全环境
+
+### 3.4 运行时配置
 
 可以在运行时修改配置：
 

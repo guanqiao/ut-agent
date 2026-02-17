@@ -19,7 +19,7 @@ class PreferenceSample:
 class PreferenceLearner:
     """偏好学习器 - 从用户行为学习偏好."""
     
-    def __init__(self, memory_manager=None):
+    def __init__(self, memory_manager: Optional[Any] = None) -> None:
         self._memory = memory_manager
         self._samples: Dict[str, List[PreferenceSample]] = defaultdict(list)
         self._learned_preferences: Dict[str, Any] = {}
@@ -30,7 +30,7 @@ class PreferenceLearner:
         action: str,
         outcome: str,
         feedback: str,
-        metadata: Dict[str, Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         sample = PreferenceSample(
             action=action,

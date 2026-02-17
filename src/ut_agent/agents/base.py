@@ -113,7 +113,7 @@ class BaseAgent(ABC):
         return self._memory
     
     @memory.setter
-    def memory(self, value: Any):
+    def memory(self, value: Optional[Any]) -> None:
         self._memory = value
     
     def _register_default_capability(self, capability: AgentCapability) -> None:
@@ -149,8 +149,8 @@ class BaseAgent(ABC):
     async def invoke_capability(
         self,
         capability: str,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         if capability not in self._capability_handlers:
             raise ValueError(f"Agent {self.name} does not have capability: {capability}")

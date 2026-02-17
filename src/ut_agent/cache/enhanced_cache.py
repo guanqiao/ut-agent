@@ -342,4 +342,263 @@ class EnhancedCache:
                 
                 # 从磁盘加载
                 cache_path = self._get_disk_cache_path(key)
-                if cache_path.exists
+                if cache_path.exists():
+                    try:
+                        with open(cache_path, 'rb') as f:
+                            data = f.read()
+                        
+                        # 验证校验和
+                        if not self._verify_checksum(data, meta.checksum):
+                            logger.warning(f"Checksum mismatch for key: {key}")
+                            self._remove_from_disk(key)
+                            self._disk_misses += 1
+                            return None
+                        
+                        # 解压
+                        data = self._decompress_if_needed(data, meta.compressed)
+                        
+                        # 反序列化
+                        value = self._deserialize(data)
+                        
+                        # 更新访问信息
+                        meta.access_count += 1
+                        meta.last_accessed = datetime.now()
+                        self._disk_hits += 1
+                        
+                        # 提升到内存缓存
+                        self._promote_to_memory(key, value, meta)
+                        
+                        logger.debug(f"Disk cache hit: {key}")
+                        return value
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to load from disk cache: {e}")
+                        self._remove_from_disk(key)
+            
+            self._memory_misses += 1
+            self._disk_misses += 1
+            return None
+    
+    def set(
+        self,
+        key: str,
+        value: Any,
+        ttl: Optional[int] = None,
+        store_on_disk: bool = False,
+    ) -> None:
+        """设置缓存值.
+        
+        Args:
+            key: 缓存键
+            value: 缓存值
+            ttl: TTL（秒）
+            store_on_disk: 是否存储到磁盘
+        """
+        ttl = ttl if ttl is not None else self.default_ttl
+        expires_at = datetime.now() + timedelta(seconds=ttl) if ttl > 0 else None
+        
+        with self._lock:
+            # 存入内存缓存
+            self._add_to_memory(key, value, expires_at)
+            
+            # 如果需要，存入磁盘缓存
+            if store_on_disk:
+                self._add_to_disk(key, value, expires_at)
+    
+    def _add_to_memory(self, key: str, value: Any, expires_at: Optional[datetime]) -> None:
+        """添加到内存缓存."""
+        # 检查是否需要淘汰
+        if len(self._memory_cache) >= self.max_memory_size and key not in self._memory_cache:
+            self._evict_from_memory()
+        
+        # 序列化计算大小
+        data = self._serialize(value)
+        
+        self._memory_cache[key] = value
+        self._memory_metadata[key] = CacheMetadata(
+            key=key,
+            created_at=datetime.now(),
+            expires_at=expires_at,
+            size_bytes=len(data),
+        )
+        self._memory_cache.move_to_end(key)
+    
+    def _add_to_disk(self, key: str, value: Any, expires_at: Optional[datetime]) -> None:
+        """添加到磁盘缓存."""
+        # 检查是否需要淘汰
+        if len(self._disk_metadata) >= self.max_disk_size and key not in self._disk_metadata:
+            self._evict_from_disk()
+        
+        try:
+            # 序列化
+            data = self._serialize(value)
+            
+            # 压缩
+            data, compressed = self._compress_if_needed(data)
+            
+            # 计算校验和
+            checksum = self._compute_checksum(data)
+            
+            # 保存到磁盘
+            cache_path = self._get_disk_cache_path(key)
+            with open(cache_path, 'wb') as f:
+                f.write(data)
+            
+            # 更新元数据
+            self._disk_metadata[key] = CacheMetadata(
+                key=key,
+                created_at=datetime.now(),
+                expires_at=expires_at,
+                size_bytes=len(data),
+                compressed=compressed,
+                checksum=checksum,
+            )
+            
+            # 保存索引
+            self._save_disk_index()
+            
+        except Exception as e:
+            logger.warning(f"Failed to save to disk cache: {e}")
+    
+    def _promote_to_memory(self, key: str, value: Any, disk_meta: CacheMetadata) -> None:
+        """将磁盘缓存提升到内存缓存."""
+        self._add_to_memory(key, value, disk_meta.expires_at)
+    
+    def _remove_from_memory(self, key: str) -> None:
+        """从内存缓存移除."""
+        if key in self._memory_cache:
+            del self._memory_cache[key]
+        if key in self._memory_metadata:
+            del self._memory_metadata[key]
+    
+    def _remove_from_disk(self, key: str) -> None:
+        """从磁盘缓存移除."""
+        cache_path = self._get_disk_cache_path(key)
+        if cache_path.exists():
+            cache_path.unlink()
+        if key in self._disk_metadata:
+            del self._disk_metadata[key]
+        self._save_disk_index()
+    
+    def _evict_from_memory(self) -> None:
+        """从内存缓存淘汰."""
+        if not self._memory_cache:
+            return
+        
+        # LRU 淘汰
+        oldest_key = next(iter(self._memory_cache))
+        self._remove_from_memory(oldest_key)
+        logger.debug(f"Evicted from memory: {oldest_key}")
+    
+    def _evict_from_disk(self) -> None:
+        """从磁盘缓存淘汰."""
+        if not self._disk_metadata:
+            return
+        
+        # 淘汰最少访问的
+        lru_key = min(
+            self._disk_metadata.keys(),
+            key=lambda k: (self._disk_metadata[k].last_accessed or datetime.min, self._disk_metadata[k].access_count)
+        )
+        self._remove_from_disk(lru_key)
+        logger.debug(f"Evicted from disk: {lru_key}")
+    
+    def delete(self, key: str) -> bool:
+        """删除缓存.
+        
+        Args:
+            key: 缓存键
+            
+        Returns:
+            bool: 是否成功删除
+        """
+        with self._lock:
+            removed = False
+            
+            if key in self._memory_cache:
+                self._remove_from_memory(key)
+                removed = True
+            
+            if key in self._disk_metadata:
+                self._remove_from_disk(key)
+                removed = True
+            
+            return removed
+    
+    def clear(self) -> None:
+        """清空所有缓存."""
+        with self._lock:
+            # 清空内存
+            self._memory_cache.clear()
+            self._memory_metadata.clear()
+            
+            # 清空磁盘
+            for key in list(self._disk_metadata.keys()):
+                self._remove_from_disk(key)
+            
+            # 重置统计
+            self._memory_hits = 0
+            self._memory_misses = 0
+            self._disk_hits = 0
+            self._disk_misses = 0
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """获取统计信息.
+        
+        Returns:
+            Dict[str, Any]: 统计信息
+        """
+        with self._lock:
+            memory_total = self._memory_hits + self._memory_misses
+            disk_total = self._disk_hits + self._disk_misses
+            
+            return {
+                "memory": {
+                    "size": len(self._memory_cache),
+                    "max_size": self.max_memory_size,
+                    "hits": self._memory_hits,
+                    "misses": self._memory_misses,
+                    "hit_rate": self._memory_hits / memory_total if memory_total > 0 else 0.0,
+                },
+                "disk": {
+                    "size": len(self._disk_metadata),
+                    "max_size": self.max_disk_size,
+                    "hits": self._disk_hits,
+                    "misses": self._disk_misses,
+                    "hit_rate": self._disk_hits / disk_total if disk_total > 0 else 0.0,
+                },
+                "compression": {
+                    "enabled": self.compression_enabled,
+                    "threshold": self.compression_threshold,
+                },
+            }
+    
+    def cleanup_expired(self) -> int:
+        """清理过期缓存.
+        
+        Returns:
+            int: 清理的条目数
+        """
+        count = 0
+        now = datetime.now()
+        
+        with self._lock:
+            # 清理内存
+            expired_memory = [
+                key for key, meta in self._memory_metadata.items()
+                if meta.expires_at and now > meta.expires_at
+            ]
+            for key in expired_memory:
+                self._remove_from_memory(key)
+                count += 1
+            
+            # 清理磁盘
+            expired_disk = [
+                key for key, meta in self._disk_metadata.items()
+                if meta.expires_at and now > meta.expires_at
+            ]
+            for key in expired_disk:
+                self._remove_from_disk(key)
+                count += 1
+        
+        return count

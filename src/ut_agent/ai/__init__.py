@@ -7,6 +7,14 @@ from ut_agent.ai.prompt_versioning import (
     PromptABTest,
     PromptPerformanceTracker,
 )
+from ut_agent.ai.model_finetuning import (
+    FinetuningJob,
+    FinetuningStatus,
+    FinetuningDataset,
+    FinetuningManager,
+    OpenAIFinetuningProvider,
+    DatasetValidator,
+)
 
 __all__ = [
     "PromptVersion",
@@ -14,4 +22,10 @@ __all__ = [
     "PromptVersionManager",
     "PromptABTest",
     "PromptPerformanceTracker",
+    "FinetuningJob",
+    "FinetuningStatus",
+    "FinetuningDataset",
+    "FinetuningManager",
+    "OpenAIFinetuningProvider",
+    "DatasetValidator",
 ]

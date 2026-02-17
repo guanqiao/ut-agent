@@ -1,352 +1,396 @@
-"""代码分析模块重构版测试."""
+"""代码分析器重构版测试模块."""
+
+import tempfile
+from pathlib import Path
+from typing import Dict, List, Any
+from unittest.mock import MagicMock, patch
 
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 
 from ut_agent.tools.code_analyzer_refactored import (
     FileReader,
-    JavaASTParser,
-    JavaInfoExtractor,
-    JavaMethodParser,
-    JavaFieldParser,
-    JavaParamParser,
-    analyze_java_file_refactored,
+    JavaAnalyzer,
+    TypeScriptAnalyzer,
+    AnalysisResult,
     MethodInfo,
+    ClassInfo,
 )
-from ut_agent.exceptions import FileReadError
 
 
 class TestFileReader:
-    """文件读取器测试."""
+    """FileReader 测试."""
 
-    def test_read_file_success(self, tmp_path):
+    @pytest.fixture
+    def temp_dir(self):
+        """创建临时目录."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def test_read_file_success(self, temp_dir):
         """测试成功读取文件."""
-        test_file = tmp_path / "Test.java"
+        test_file = temp_dir / "Test.java"
         test_file.write_text("public class Test {}", encoding="utf-8")
-        
+
         content = FileReader.read_file(str(test_file))
-        
+
         assert content == "public class Test {}"
 
     def test_read_file_not_found(self):
         """测试文件不存在."""
-        with pytest.raises(FileReadError) as exc_info:
-            FileReader.read_file("/nonexistent/file.java")
-        
-        assert exc_info.value.details.get("reason") == "not_found"
+        from ut_agent.exceptions import FileReadError
 
-    def test_read_file_permission_error(self, tmp_path):
+        with pytest.raises(FileReadError) as exc_info:
+            FileReader.read_file("/nonexistent/path/Test.java")
+
+        assert exc_info.value.file_path == "/nonexistent/path/Test.java"
+
+    def test_read_file_encoding_error(self, temp_dir):
+        """测试编码错误."""
+        from ut_agent.exceptions import FileReadError
+
+        test_file = temp_dir / "Test.java"
+        test_file.write_bytes(b"\xff\xfe Invalid UTF-8")
+
+        with pytest.raises(FileReadError) as exc_info:
+            FileReader.read_file(str(test_file))
+
+        assert exc_info.value.reason == "encoding"
+
+    def test_read_file_permission_error(self, temp_dir):
         """测试权限错误."""
-        import os
-        test_file = tmp_path / "readonly.java"
+        from ut_agent.exceptions import FileReadError
+
+        test_file = temp_dir / "Test.java"
         test_file.write_text("content", encoding="utf-8")
-        
-        # Windows 上权限测试可能不生效，跳过
-        if os.name == 'nt':
-            pytest.skip("Permission test skipped on Windows")
-        
-        test_file.chmod(0o000)
-        
-        try:
+
+        with patch("pathlib.Path.read_text", side_effect=PermissionError("Permission denied")):
             with pytest.raises(FileReadError) as exc_info:
                 FileReader.read_file(str(test_file))
-            assert exc_info.value.details.get("reason") == "permission"
-        finally:
-            test_file.chmod(0o644)
+
+            assert exc_info.value.reason == "permission"
 
 
-class TestJavaASTParser:
-    """Java AST 解析器测试."""
+class TestMethodInfo:
+    """MethodInfo 测试."""
 
-    def test_parse_with_cache_disabled(self):
-        """测试禁用缓存."""
-        result = JavaASTParser.parse("/test/File.java", use_cache=False)
-        assert result is None
-
-    @patch("ut_agent.tools.code_analyzer_refactored.parse_java_ast")
-    def test_parse_with_cache_success(self, mock_parse):
-        """测试缓存解析成功."""
-        mock_ast = {"type": "program", "children": []}
-        mock_parse.return_value = mock_ast
-        
-        result = JavaASTParser.parse("/test/File.java", use_cache=True)
-        
-        assert result == mock_ast
-        mock_parse.assert_called_once()
-
-    @patch("ut_agent.tools.code_analyzer_refactored.parse_java_ast")
-    def test_parse_with_cache_error(self, mock_parse):
-        """测试缓存解析失败."""
-        mock_parse.side_effect = Exception("Parse error")
-        
-        result = JavaASTParser.parse("/test/File.java", use_cache=True)
-        
-        assert result is None
-
-
-class TestJavaInfoExtractor:
-    """Java 信息提取器测试."""
-
-    def test_extract_package_regex(self):
-        """测试正则提取包名."""
-        content = "package com.example.test;\npublic class Test {}"
-        package = JavaInfoExtractor._extract_package_regex(content)
-        assert package == "com.example.test"
-
-    def test_extract_package_regex_no_package(self):
-        """测试无包名."""
-        content = "public class Test {}"
-        package = JavaInfoExtractor._extract_package_regex(content)
-        assert package == ""
-
-    def test_extract_imports_regex(self):
-        """测试正则提取导入."""
-        content = """
-import java.util.List;
-import java.util.Map;
-public class Test {}
-"""
-        imports = JavaInfoExtractor._extract_imports_regex(content)
-        assert "java.util.List" in imports
-        assert "java.util.Map" in imports
-
-    def test_extract_class_info_regex(self):
-        """测试正则提取类信息."""
-        content = "@Component\npublic class TestClass {}"
-        path = Path("/test/TestClass.java")
-        
-        class_name, annotations = JavaInfoExtractor._extract_class_info_regex(content, path)
-        
-        assert class_name == "TestClass"
-        assert "Component" in annotations
-
-    def test_extract_methods_regex(self):
-        """测试正则提取方法."""
-        content = """
-public class Test {
-    public String getName(int id) { return ""; }
-    private void helper() {}
-}
-"""
-        methods = JavaInfoExtractor._extract_methods_regex(content)
-        
-        assert len(methods) == 2
-        assert methods[0].name == "getName"
-        assert methods[0].is_public is True
-        assert methods[1].name == "helper"
-        assert methods[1].is_public is False
-
-    def test_extract_fields_regex(self):
-        """测试正则提取字段."""
-        content = """
-public class Test {
-    private String name;
-    public int age;
-}
-"""
-        fields = JavaInfoExtractor._extract_fields_regex(content)
-        
-        assert len(fields) == 2
-        assert fields[0]["name"] == "name"
-        assert fields[0]["type"] == "String"
-
-    def test_extract_from_ast(self):
-        """测试从 AST 提取."""
-        ast_data = {
-            "type": "program",
-            "children": [
-                {
-                    "type": "package_declaration",
-                    "children": [
-                        {"type": "scoped_identifier", "text": "com.example"}
-                    ]
-                },
-                {
-                    "type": "class_declaration",
-                    "children": [
-                        {"type": "identifier", "text": "TestClass"}
-                    ]
-                }
-            ]
-        }
-        
-        package, imports, class_name, annotations, methods, fields = JavaInfoExtractor._extract_from_ast(
-            ast_data, "content"
+    def test_method_info_creation(self):
+        """测试方法信息创建."""
+        method = MethodInfo(
+            name="getUser",
+            signature="public User getUser(Long id)",
+            return_type="User",
+            parameters=[{"type": "Long", "name": "id"}],
+            annotations=["Override"],
+            start_line=10,
+            end_line=20,
+            is_public=True,
+            is_static=False,
         )
-        
-        assert package == "com.example"
-        assert class_name == "TestClass"
 
-
-class TestJavaParamParser:
-    """Java 参数解析器测试."""
-
-    def test_parse_ast(self):
-        """测试 AST 解析参数."""
-        params_node = {
-            "children": [
-                {
-                    "type": "formal_parameter",
-                    "children": [
-                        {"type": "type_identifier", "text": "String"},
-                        {"type": "identifier", "text": "name"}
-                    ]
-                }
-            ]
-        }
-        
-        params = JavaParamParser.parse_ast(params_node)
-        
-        assert len(params) == 1
-        assert params[0]["type"] == "String"
-        assert params[0]["name"] == "name"
-
-    def test_parse_regex(self):
-        """测试正则解析参数."""
-        params_str = "String name, int age"
-        
-        params = JavaParamParser.parse_regex(params_str)
-        
-        assert len(params) == 2
-        assert params[0]["type"] == "String"
-        assert params[0]["name"] == "name"
-
-    def test_parse_regex_empty(self):
-        """测试空参数."""
-        params = JavaParamParser.parse_regex("")
-        assert params == []
-
-
-class TestJavaFieldParser:
-    """Java 字段解析器测试."""
-
-    def test_parse_field(self):
-        """测试解析字段."""
-        field_node = {
-            "children": [
-                {"type": "type_identifier", "text": "String"},
-                {
-                    "type": "variable_declarator",
-                    "children": [
-                        {"type": "identifier", "text": "userName"}
-                    ]
-                },
-                {
-                    "type": "modifiers",
-                    "children": [
-                        {"type": "private"}
-                    ]
-                }
-            ]
-        }
-        
-        field = JavaFieldParser.parse(field_node)
-        
-        assert field is not None
-        assert field["name"] == "userName"
-        assert field["type"] == "String"
-        assert field["access"] == "private"
-
-    def test_parse_field_incomplete(self):
-        """测试不完整字段."""
-        field_node = {"children": []}
-        
-        field = JavaFieldParser.parse(field_node)
-        
-        assert field is None
-
-
-class TestJavaMethodParser:
-    """Java 方法解析器测试."""
-
-    def test_parse_method(self):
-        """测试解析方法."""
-        method_node = {
-            "children": [
-                {"type": "identifier", "text": "getUser"},
-                {"type": "type_identifier", "text": "User"},
-                {
-                    "type": "formal_parameters",
-                    "children": [
-                        {
-                            "type": "formal_parameter",
-                            "children": [
-                                {"type": "type_identifier", "text": "int"},
-                                {"type": "identifier", "text": "id"}
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "type": "modifiers",
-                    "children": [
-                        {"type": "public"},
-                        {"type": "static"}
-                    ]
-                }
-            ],
-            "start_point": {"row": 10},
-            "end_point": {"row": 15}
-        }
-        
-        method = JavaMethodParser.parse(method_node, "content")
-        
-        assert method is not None
         assert method.name == "getUser"
         assert method.return_type == "User"
+        assert len(method.parameters) == 1
         assert method.is_public is True
-        assert method.is_static is True
-        assert method.start_line == 11
 
-    def test_parse_method_no_name(self):
-        """测试无名称方法."""
-        method_node = {"children": []}
-        
-        method = JavaMethodParser.parse(method_node, "content")
-        
-        assert method is None
+    def test_method_info_to_dict(self):
+        """测试方法信息转字典."""
+        method = MethodInfo(
+            name="save",
+            signature="public void save()",
+            return_type="void",
+            parameters=[],
+            annotations=[],
+            start_line=5,
+            end_line=10,
+        )
+
+        result = method.to_dict()
+
+        assert result["name"] == "save"
+        assert result["return_type"] == "void"
+        assert result["is_public"] is True
 
 
-class TestAnalyzeJavaFileRefactored:
-    """重构版 analyze_java_file 测试."""
+class TestClassInfo:
+    """ClassInfo 测试."""
 
-    def test_analyze_java_file_success(self, tmp_path):
-        """测试成功分析 Java 文件."""
-        java_file = tmp_path / "TestService.java"
-        java_file.write_text("""
+    def test_class_info_creation(self):
+        """测试类信息创建."""
+        class_info = ClassInfo(
+            name="UserService",
+            package="com.example.service",
+            imports=["java.util.List", "org.springframework.stereotype.Service"],
+            annotations=["Service"],
+            methods=[],
+            fields=[],
+        )
+
+        assert class_info.name == "UserService"
+        assert class_info.package == "com.example.service"
+        assert len(class_info.imports) == 2
+
+    def test_class_info_with_inheritance(self):
+        """测试带继承的类信息."""
+        class_info = ClassInfo(
+            name="UserServiceImpl",
+            package="com.example.service",
+            imports=[],
+            annotations=[],
+            methods=[],
+            fields=[],
+            superclass="BaseService",
+            interfaces=["UserService", "Serializable"],
+        )
+
+        assert class_info.superclass == "BaseService"
+        assert len(class_info.interfaces) == 2
+
+
+class TestJavaAnalyzer:
+    """JavaAnalyzer 测试."""
+
+    @pytest.fixture
+    def analyzer(self):
+        """创建分析器实例."""
+        return JavaAnalyzer()
+
+    @pytest.fixture
+    def sample_java_content(self):
+        """示例 Java 代码."""
+        return """
 package com.example.service;
 
 import java.util.List;
+import org.springframework.stereotype.Service;
 
-public class TestService {
-    private String name;
+@Service
+public class UserService {
+    private UserRepository userRepository;
     
-    public String getName(int id) {
-        return name;
+    public User getUser(Long id) {
+        return userRepository.findById(id);
+    }
+    
+    public void saveUser(User user) {
+        userRepository.save(user);
+    }
+    
+    private void internalMethod() {
+        // private method
+    }
+}
+"""
+
+    def test_extract_package(self, analyzer, sample_java_content):
+        """测试提取包名."""
+        package = analyzer.extract_package(sample_java_content)
+
+        assert package == "com.example.service"
+
+    def test_extract_imports(self, analyzer, sample_java_content):
+        """测试提取导入."""
+        imports = analyzer.extract_imports(sample_java_content)
+
+        assert len(imports) == 2
+        assert "java.util.List" in imports
+        assert "org.springframework.stereotype.Service" in imports
+
+    def test_extract_class_name(self, analyzer, sample_java_content):
+        """测试提取类名."""
+        class_name = analyzer.extract_class_name(sample_java_content)
+
+        assert class_name == "UserService"
+
+    def test_extract_class_annotations(self, analyzer, sample_java_content):
+        """测试提取类注解."""
+        annotations = analyzer.extract_class_annotations(sample_java_content)
+
+        assert "Service" in annotations
+
+    def test_extract_methods(self, analyzer, sample_java_content):
+        """测试提取方法."""
+        methods = analyzer.extract_methods(sample_java_content)
+
+        assert len(methods) >= 2
+        method_names = [m.name for m in methods]
+        assert "getUser" in method_names
+        assert "saveUser" in method_names
+
+    def test_extract_fields(self, analyzer, sample_java_content):
+        """测试提取字段."""
+        fields = analyzer.extract_fields(sample_java_content)
+
+        assert len(fields) == 1
+        assert fields[0]["name"] == "userRepository"
+
+    def test_analyze_full(self, analyzer, sample_java_content):
+        """测试完整分析."""
+        result = analyzer.analyze(sample_java_content, "/src/UserService.java")
+
+        assert result.class_name == "UserService"
+        assert result.package == "com.example.service"
+        assert len(result.methods) >= 2
+
+
+class TestTypeScriptAnalyzer:
+    """TypeScriptAnalyzer 测试."""
+
+    @pytest.fixture
+    def analyzer(self):
+        """创建分析器实例."""
+        return TypeScriptAnalyzer()
+
+    @pytest.fixture
+    def sample_ts_content(self):
+        """示例 TypeScript 代码."""
+        return """
+import { ref, computed } from 'vue';
+import type { User } from './types';
+
+export function getUser(id: number): Promise<User> {
+    return fetch(`/api/users/${id}`).then(r => r.json());
+}
+
+export const formatDate = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+};
+
+async function internalHelper() {
+    // helper
+}
+"""
+
+    def test_extract_imports(self, analyzer, sample_ts_content):
+        """测试提取导入."""
+        imports = analyzer.extract_imports(sample_ts_content)
+
+        assert len(imports) >= 1
+
+    def test_extract_functions(self, analyzer, sample_ts_content):
+        """测试提取函数."""
+        functions = analyzer.extract_functions(sample_ts_content)
+
+        func_names = [f["name"] for f in functions]
+        assert "getUser" in func_names
+        assert "formatDate" in func_names
+
+    def test_extract_arrow_functions(self, analyzer, sample_ts_content):
+        """测试提取箭头函数."""
+        functions = analyzer.extract_functions(sample_ts_content)
+
+        arrow_funcs = [f for f in functions if f["type"] == "arrow_function"]
+        assert len(arrow_funcs) >= 1
+
+    def test_analyze_full(self, analyzer, sample_ts_content):
+        """测试完整分析."""
+        result = analyzer.analyze(sample_ts_content, "/src/user.ts")
+
+        assert result.file_name == "user.ts"
+        assert len(result.functions) >= 2
+
+
+class TestAnalysisResult:
+    """AnalysisResult 测试."""
+
+    def test_java_analysis_result(self):
+        """测试 Java 分析结果."""
+        result = AnalysisResult(
+            file_path="/src/Test.java",
+            file_name="Test.java",
+            language="java",
+            package="com.example",
+            class_name="Test",
+            imports=["java.util.List"],
+            methods=[],
+            fields=[],
+            content="public class Test {}",
+            line_count=1,
+        )
+
+        assert result.language == "java"
+        assert result.class_name == "Test"
+
+    def test_typescript_analysis_result(self):
+        """测试 TypeScript 分析结果."""
+        result = AnalysisResult(
+            file_path="/src/utils.ts",
+            file_name="utils.ts",
+            language="typescript",
+            imports=[],
+            functions=[{"name": "helper", "type": "function"}],
+            content="export function helper() {}",
+            line_count=1,
+        )
+
+        assert result.language == "typescript"
+        assert len(result.functions) == 1
+
+    def test_to_dict(self):
+        """测试转字典."""
+        result = AnalysisResult(
+            file_path="/src/Test.java",
+            file_name="Test.java",
+            language="java",
+            package="com.example",
+            class_name="Test",
+            imports=[],
+            methods=[],
+            fields=[],
+            content="",
+            line_count=0,
+        )
+
+        result_dict = result.to_dict()
+
+        assert result_dict["file_path"] == "/src/Test.java"
+        assert result_dict["language"] == "java"
+
+
+class TestIntegration:
+    """集成测试."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        """创建临时目录."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def test_analyze_java_file_integration(self, temp_dir):
+        """测试 Java 文件分析集成."""
+        java_file = temp_dir / "Calculator.java"
+        java_file.write_text("""
+package com.example.math;
+
+public class Calculator {
+    public int add(int a, int b) {
+        return a + b;
+    }
+    
+    public int subtract(int a, int b) {
+        return a - b;
     }
 }
 """, encoding="utf-8")
-        
-        result = analyze_java_file_refactored(str(java_file))
-        
-        assert result["language"] == "java"
-        assert result["package"] == "com.example.service"
-        assert result["class_name"] == "TestService"
-        assert len(result["methods"]) == 1
-        assert result["methods"][0]["name"] == "getName"
 
-    def test_analyze_java_file_not_found(self):
-        """测试文件不存在."""
-        with pytest.raises(FileReadError):
-            analyze_java_file_refactored("/nonexistent/Test.java")
+        analyzer = JavaAnalyzer()
+        result = analyzer.analyze(java_file.read_text(encoding="utf-8"), str(java_file))
 
-    def test_analyze_java_file_empty_class(self, tmp_path):
-        """测试空类."""
-        java_file = tmp_path / "Empty.java"
-        java_file.write_text("public class Empty {}", encoding="utf-8")
-        
-        result = analyze_java_file_refactored(str(java_file))
-        
-        assert result["class_name"] == "Empty"
-        assert result["methods"] == []
+        assert result.class_name == "Calculator"
+        assert result.package == "com.example.math"
+        assert len(result.methods) == 2
+
+    def test_analyze_typescript_file_integration(self, temp_dir):
+        """测试 TypeScript 文件分析集成."""
+        ts_file = temp_dir / "helpers.ts"
+        ts_file.write_text("""
+export function greet(name: string): string {
+    return `Hello, ${name}!`;
+}
+
+export const double = (x: number): number => x * 2;
+""", encoding="utf-8")
+
+        analyzer = TypeScriptAnalyzer()
+        result = analyzer.analyze(ts_file.read_text(encoding="utf-8"), str(ts_file))
+
+        assert len(result.functions) >= 2

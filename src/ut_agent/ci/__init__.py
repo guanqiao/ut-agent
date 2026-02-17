@@ -9,6 +9,14 @@ from ut_agent.ci.github_actions import (
     GitHubCommentReporter,
     GitHubStatusReporter,
 )
+from ut_agent.ci.gitlab_ci import (
+    GitLabCIJob,
+    GitLabCIStage,
+    GitLabCIConfig,
+    GitLabCIGenerator,
+    GitLabMRReporter,
+    GitLabPipelineTrigger,
+)
 
 __all__ = [
     "GitHubActionsWorkflow",
@@ -18,4 +26,10 @@ __all__ = [
     "GitHubActionsGenerator",
     "GitHubCommentReporter",
     "GitHubStatusReporter",
+    "GitLabCIJob",
+    "GitLabCIStage",
+    "GitLabCIConfig",
+    "GitLabCIGenerator",
+    "GitLabMRReporter",
+    "GitLabPipelineTrigger",
 ]
